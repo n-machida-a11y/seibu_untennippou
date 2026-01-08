@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>かんたん運転日報 V3.6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { font-size: 18px; background: #f3f4f6; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #111827; line-height: 1.5; }
+        .screen { display: none; padding-bottom: 120px; }
+        .screen.active { display: block; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid #e5e7eb; }
+        .btn { min-height: 64px; border-radius: 10px; font-weight: bold; font-size: 18px; display: flex; align-items: center; justify-content: center; width: 100%; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
+        .btn-primary { background-color: #2563eb; color: white; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3); }
+        .btn-secondary { background-color: #e5e7eb; color: #1f2937; }
+        .btn-outline { background-color: white; border: 2px solid #d1d5db; color: #374151; }
+        .btn-warning { background-color: #f59e0b; color: white; }
+        .btn-success { background-color: #10b981; color: white; }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .label { display: block; font-weight: 800; font-size: 16px; color: #374151; margin-bottom: 8px; }
+        .input-field { width: 100%; height: 60px; padding: 0 16px; border: 2px solid #d1d5db; border-radius: 8px; background: #fff; font-size: 20px; font-weight: 500; }
+        .input-field:focus { outline: none; border-color: #2563eb; }
+        .toggle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .toggle-btn { height: 60px; border: 2px solid #d1d5db; background: #f9fafb; border-radius: 8px; font-weight: bold; color: #6b7280; font-size: 18px; }
+        .toggle-btn.active { background-color: #10b981; color: white; border-color: #10b981; }
+        
+        .excel-wrapper { overflow-x: auto; border: 2px solid #d1d5db; border-radius: 8px; background: white; max-height: 75vh; }
+        .excel-table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1000px; }
+        .excel-table th { background-color: #e5e7eb; color: #1f2937; font-weight: 800; padding: 8px; border: 1px solid #9ca3af; text-align: center; font-size: 14px; position: sticky; top: 0; z-index: 20; }
+        .excel-table td { border: 1px solid #d1d5db; padding: 0; height: 54px; position: relative; }
+        .row-saturday { background-color: #eff6ff; }
+        .row-sunday { background-color: #fef2f2; }
+        .cell-input { width: 100%; height: 100%; border: none; padding: 0 4px; font-size: 16px; text-align: center; background: transparent; font-family: monospace; }
+        .cell-input:focus { background-color: #fff; outline: 2px solid #2563eb; z-index: 10; }
+        .cell-input:disabled { background-color: #f3f4f6; color: #9ca3af; }
+        .cell-modified { color: #dc2626; font-weight: bold; background-color: #fef2f2; }
+        .cell-date { padding: 8px; font-size: 14px; font-weight: bold; white-space: nowrap; text-align: center; }
+        .cell-toggle { cursor: pointer; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; }
+        .val-done { color: #059669; }
+        .val-none { color: #d1d5db; }
+        .val-alert { color: #ef4444; font-weight: 900; }
+        .cell-disabled { pointer-events: none; opacity: 0.5; background-color: #f3f4f6; }
+        
+        .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 9999; align-items: center; justify-content: center; flex-direction: column; }
+        .loading-overlay.active { display: flex; }
+        .spinner { width: 50px; height: 50px; border: 5px solid #e5e7eb; border-top: 5px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 24px; border-radius: 30px; font-weight: bold; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 10000; white-space: nowrap; }
+    </style>
+</head>
+<body>
+    <div id="app-container" class="max-w-full mx-auto p-2">
+
+        <!-- ログイン画面 -->
+        <div id="screen-login" class="screen active">
+            <div class="max-w-2xl mx-auto p-4">
+                <div class="text-center py-12">
+                    <h1 class="text-3xl font-extrabold text-gray-800 mb-2">かんたん運転日報</h1>
+                    <p class="text-gray-500">Ver 3.6</p>
+                </div>
+                <div class="card shadow-lg">
+                    <label class="label mb-4 text-xl">お名前を選択してください</label>
+                    <input id="login-user-input" list="user-list" type="text" class="input-field mb-8" placeholder="ここをタップして名前を選択">
+                    <datalist id="user-list"></datalist>
+                    <button onclick="doLogin()" class="btn btn-primary text-xl">
+                        <i class="fas fa-sign-in-alt mr-3"></i> 始める
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ホーム画面 -->
+        <div id="screen-home" class="screen">
+            <div class="max-w-2xl mx-auto">
+                <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <div>
+                        <p class="text-sm text-gray-500 font-bold">ログイン中</p>
+                        <span class="font-extrabold text-2xl text-gray-800" id="home-user-name">ユーザー</span>
+                    </div>
+                    <button onclick="logout()" class="text-gray-400 font-bold px-3 py-2 border rounded hover:bg-gray-100">ログアウト</button>
+                </div>
+
+                <div class="card bg-blue-700 text-white text-center py-6 mb-8">
+                    <p class="text-sm font-bold opacity-90 mb-2">今月の走行距離</p>
+                    <p class="text-5xl font-extrabold my-2"><span id="home-total-distance">0</span> <span class="text-2xl">km</span></p>
+                    <p class="text-sm opacity-90 mb-2" id="home-period">期間: --/-- 〜 --/--</p>
+                    <div class="mt-4 inline-block bg-white text-blue-800 px-4 py-1 rounded-full font-bold shadow-sm">
+                        現在のステータス：<span id="home-status-text">読み込み中...</span>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <button onclick="startDailyReport()" class="btn btn-primary h-20 text-xl shadow-lg">
+                        <i class="fas fa-pen mr-3"></i> 今日の日報を入力
+                    </button>
+                    
+                    <button onclick="showScreen('history')" class="btn btn-outline h-16 text-lg bg-white border-2 border-purple-200 text-purple-700">
+                        <i class="fas fa-table mr-3 text-2xl"></i> 履歴・まとめて入力
+                    </button>
+                    
+                    <button id="admin-btn" onclick="showScreen('admin')" class="btn bg-gray-700 text-white mt-4" style="display:none;">
+                        <i class="fas fa-user-shield mr-2"></i> 管理者メニュー
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 履歴一覧 -->
+        <div id="screen-history" class="screen">
+            <div class="sticky top-0 z-30 bg-white p-2 border-b shadow-sm mb-2">
+                <div class="flex items-center justify-between mb-2">
+                    <button onclick="showScreen('home')" class="text-gray-500 font-bold px-2 py-1"><i class="fas fa-chevron-left"></i> 戻る</button>
+                    <div class="flex items-center gap-2">
+                        <select id="hist-month" class="input-field w-auto h-10 text-lg py-0 border-gray-300" onchange="loadHistory()"></select>
+                        <span id="hist-status-badge" class="px-2 py-1 text-xs bg-gray-200 rounded font-bold">---</span>
+                    </div>
+                </div>
+                
+                <div id="history-reject-msg" class="hidden bg-red-50 border-2 border-red-300 text-red-800 p-3 rounded mb-2 shadow-sm">
+                    <p class="font-bold flex items-center"><i class="fas fa-exclamation-circle mr-2 text-2xl"></i>差戻し理由</p>
+                    <p id="history-reject-content" class="mt-1 font-bold text-lg pl-8 whitespace-pre-wrap"></p>
+                </div>
+
+                <div id="history-controls" class="flex gap-2">
+                    <button id="btn-bulk-save" onclick="saveBulk()" class="btn btn-primary h-12 text-lg shadow-md flex-1" disabled style="opacity:0.5;">
+                        <i class="fas fa-save mr-2"></i>一括保存
+                    </button>
+                    <button id="btn-submit-month" onclick="doSubmitFromHistory()" class="btn btn-warning h-12 text-lg shadow-md flex-1">
+                        <i class="fas fa-paper-plane mr-2"></i>月次提出
+                    </button>
+                </div>
+                
+                <div class="mt-2 text-right">
+                    <button onclick="openAddCarModal()" class="text-blue-600 font-bold text-sm bg-blue-50 px-3 py-1 rounded border border-blue-200">
+                        <i class="fas fa-plus mr-1"></i>車両を追加表示
+                    </button>
+                </div>
+
+                <div id="history-locked-msg" class="hidden bg-gray-100 text-gray-500 text-center py-2 font-bold rounded mt-2 border border-gray-300">
+                    <i class="fas fa-lock mr-2"></i>提出済みのため編集できません
+                </div>
+            </div>
+            
+            <p id="history-hint" class="text-sm text-center text-gray-500 mb-2 font-bold p-1">
+                <i class="fas fa-info-circle mr-1"></i>修正すると文字が赤くなります。「一括保存」で確定してください。
+            </p>
+            
+            <div id="history-tables-container" class="space-y-8">
+                <!-- JSで車両ごとのテーブルを生成 -->
+            </div>
+        </div>
+
+        <!-- 日報入力画面 -->
+        <div id="screen-arrival" class="screen">
+            <div class="max-w-2xl mx-auto">
+                <div class="sticky top-0 z-30 bg-white p-3 -mx-4 mb-4 shadow-md flex justify-between items-center px-4">
+                    <button onclick="showScreen('home')" class="text-gray-500 font-bold text-lg"><i class="fas fa-chevron-left mr-1"></i>戻る</button>
+                    <h2 class="font-extrabold text-xl text-gray-800">日報入力</h2>
+                    <button onclick="saveArrival()" class="bg-blue-600 text-white font-bold px-6 py-2 rounded-lg shadow-lg text-lg">保存</button>
+                </div>
+                <input type="hidden" id="record-id">
+                
+                <div class="card border-l-8 border-green-500">
+                    <p class="label text-xl mb-4 text-green-800 flex items-center"><i class="fas fa-check-circle mr-2"></i>必ずチェック</p>
+                    <div class="mb-6 pb-4 border-b-2 border-gray-100">
+                        <p class="text-base font-bold text-gray-600 mb-2">【出発前】</p>
+                        <div class="toggle-grid">
+                            <button id="btn-alc-start" class="toggle-btn active" onclick="toggleBtn(this)">アルコール済</button>
+                            <button id="btn-daily" class="toggle-btn active" onclick="toggleBtn(this)">日常点検 良</button>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-base font-bold text-gray-600 mb-2">【帰社後】</p>
+                        <div class="toggle-grid">
+                            <button id="btn-alc-end" class="toggle-btn active" onclick="toggleBtn(this)">アルコール済</button>
+                            <button id="btn-clean" class="toggle-btn active" onclick="toggleBtn(this)">車内清掃 済</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-l-8 border-blue-500">
+                    <p class="label text-xl mb-4 text-blue-800 flex items-center"><i class="fas fa-tachometer-alt mr-2"></i>メーター入力</p>
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="flex-1"><label class="text-sm font-bold text-gray-500 mb-1 block">出発時</label><input id="arr-dep-meter" type="tel" class="input-field text-center font-bold text-2xl h-16" placeholder="自動" readonly style="background:#f3f4f6;"></div>
+                        <div class="text-gray-300 text-2xl pt-6"><i class="fas fa-arrow-right"></i></div>
+                        <div class="flex-1"><label class="text-sm font-bold text-gray-500 mb-1 block">帰着時</label><input id="arr-meter" type="tel" class="input-field text-center font-bold text-2xl h-16" placeholder="0" oninput="calcDist()"></div>
+                    </div>
+                    <div class="text-right pt-2 mt-2"><span class="text-sm font-bold text-gray-500">走行距離:</span><span id="arr-dist" class="text-3xl font-extrabold text-blue-600 ml-2">0</span><span class="text-lg font-bold text-gray-600">km</span></div>
+                </div>
+
+                <div class="card">
+                    <label class="label text-lg mb-2">行先・業務</label><input id="arr-dest" type="text" class="input-field mb-6 h-16 text-lg" placeholder="例: 大阪支店">
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="relative"><label class="label mb-1">給油</label><input id="arr-refuel" type="tel" class="input-field text-right pl-2 pr-10" placeholder="0"><span class="absolute bottom-4 right-4 text-gray-400 font-bold text-lg">L</span></div>
+                        <div><label class="label mb-1">不具合</label><button id="btn-trouble" class="toggle-btn w-full" onclick="toggleTrouble(this)">なし</button></div>
+                    </div>
+                    <textarea id="trouble-detail" class="input-field mb-4 h-24 border-red-300 bg-red-50" style="display:none;" placeholder="不具合の詳細を入力"></textarea>
+                    <label class="label mb-1">備考</label><textarea id="arr-remarks" class="input-field h-24 pt-2" placeholder="何かあれば入力"></textarea>
+                </div>
+
+                <div class="card bg-gray-100">
+                    <p class="text-sm text-gray-500 mb-3 font-bold">※日付や車両を変更する場合</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="label text-sm">日付</label><input id="arr-date" type="date" class="input-field text-lg bg-white h-14"></div>
+                        <div><label class="label text-sm">車両</label><select id="arr-car" class="input-field text-lg bg-white h-14"></select></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理者画面 -->
+        <div id="screen-admin" class="screen">
+            <div class="max-w-4xl mx-auto p-2">
+                <div class="flex items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                    <button onclick="showScreen('home')" class="mr-4 text-gray-500 text-2xl"><i class="fas fa-arrow-left"></i></button>
+                    <div>
+                        <h2 class="font-extrabold text-2xl text-gray-800">管理者承認画面</h2>
+                        <p class="text-sm text-gray-500">担当拠点: <span id="admin-base-display" class="font-bold">読込中...</span></p>
+                    </div>
+                </div>
+                <div id="admin-list-container" class="space-y-4">
+                    <p class="text-center py-8 text-gray-500">未承認のデータはありません</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 車両追加モーダル -->
+        <div id="add-car-modal" class="loading-overlay" style="background: rgba(0,0,0,0.5);">
+            <div class="bg-white p-6 rounded-xl w-11/12 max-w-md shadow-2xl">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">表示する車両を追加</h3>
+                <select id="add-car-select" class="input-field mb-6 text-lg"></select>
+                <div class="flex gap-3">
+                    <button onclick="closeAddCarModal()" class="btn btn-secondary">キャンセル</button>
+                    <button onclick="execAddCar()" class="btn btn-primary">追加</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 差戻しモーダル -->
+        <div id="reject-modal" class="loading-overlay" style="background: rgba(0,0,0,0.5);">
+            <div class="bg-white p-6 rounded-xl w-11/12 max-w-md shadow-2xl">
+                <h3 class="text-xl font-bold text-red-600 mb-4">差戻し処理</h3>
+                <textarea id="reject-comment" class="input-field h-32 mb-4" placeholder="理由を入力してください"></textarea>
+                <div class="flex gap-3">
+                    <button onclick="closeRejectModal()" class="btn btn-secondary">キャンセル</button>
+                    <button onclick="execReject()" class="btn btn-danger">確定</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ローディング & トースト -->
+    <div id="loading" class="loading-overlay">
+        <div class="spinner"></div>
+        <p class="text-white font-bold text-xl">処理中...</p>
+    </div>
+    <div id="toast">保存しました</div>
+
+    <script>
+        let currentUser = null;
+        let currentYearMonth = '';
+        let carListCache = [];
+        let carHistoriesCache = []; 
+        let hasUnsavedChanges = false;
+        let rejectTarget = null;
+        let extraCars = []; // 追加表示する車両リスト
+
+        document.addEventListener('DOMContentLoaded', () => {
+            google.script.run.withSuccessHandler(showLogin).getUserList();
+        });
+
+        function showLogin(result) {
+            if(result.success) {
+                const dl = document.getElementById('user-list');
+                dl.innerHTML = '';
+                result.users.forEach(u => {
+                    const op = document.createElement('option');
+                    op.value = u.name;
+                    dl.appendChild(op);
+                });
+            } else { alert(result.message); }
+        }
+
+        function doLogin() {
+            const name = document.getElementById('login-user-input').value;
+            if(!name) return alert('氏名を入力してください');
+            showLoading();
+            google.script.run.withSuccessHandler(res => {
+                hideLoading();
+                if(res.success) {
+                    currentUser = res.user;
+                    document.getElementById('home-user-name').textContent = currentUser.name + ' さん';
+                    if(currentUser.role === '管理者') document.getElementById('admin-btn').style.display = 'block';
+                    loadHomeDataInBackground();
+                    startDailyReport();
+                } else { alert(res.message); }
+            }).login(name);
+        }
+
+        function logout() { currentUser = null; showScreen('login'); }
+
+        function showScreen(name) {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById('screen-' + name).classList.add('active');
+            window.scrollTo(0,0);
+            if(name === 'home') loadHome();
+            if(name === 'history') loadHistoryInit();
+            if(name === 'admin') loadAdminData();
+        }
+
+        function showLoading() { document.getElementById('loading').classList.add('active'); }
+        function hideLoading() { document.getElementById('loading').classList.remove('active'); }
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.opacity = '1';
+            setTimeout(() => { t.style.opacity = '0'; }, 2000);
+        }
+
+        function loadHomeDataInBackground() {
+            google.script.run.withSuccessHandler(res => { currentYearMonth = res.yearMonth; }).testGetCurrentYearMonth();
+        }
+
+        function loadHome() {
+            if(!currentYearMonth) {
+                google.script.run.withSuccessHandler(res => { currentYearMonth = res.yearMonth; loadHome(); }).testGetCurrentYearMonth();
+                return;
+            }
+            google.script.run.withSuccessHandler(res => {
+                if(res.success) {
+                    document.getElementById('home-total-distance').textContent = res.totalDistance.toLocaleString();
+                    document.getElementById('home-status-text').textContent = res.status;
+                }
+            }).getMonthlyDistance(currentUser.userId, currentYearMonth);
+            google.script.run.withSuccessHandler(res => {
+                const p = res.period;
+                const s = new Date(p.start); const e = new Date(p.end);
+                document.getElementById('home-period').textContent = `${s.getMonth()+1}/${s.getDate()} 〜 ${e.getMonth()+1}/${e.getDate()}`;
+            }).testGetCurrentYearMonth();
+        }
+
+        function loadHistoryInit() {
+            const sel = document.getElementById('hist-month');
+            sel.innerHTML = '';
+            const now = new Date();
+            const ym = currentYearMonth || (now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0'));
+            const op = document.createElement('option');
+            op.value = ym;
+            op.textContent = ym.split('-')[0] + '年' + parseInt(ym.split('-')[1]) + '月度';
+            sel.appendChild(op);
+            extraCars = []; // リセット
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const ym = document.getElementById('hist-month').value;
+            const container = document.getElementById('history-tables-container');
+            container.innerHTML = '<p class="text-center py-8 text-xl">読み込み中...</p>';
+            hasUnsavedChanges = false;
+            updateSaveButtonState();
+            
+            google.script.run.withSuccessHandler(res => {
+                if(res.success) {
+                    container.innerHTML = '';
+                    carHistoriesCache = res.carHistories; 
+                    const monthStatus = res.monthStatus || '作業中';
+                    const isLocked = (monthStatus === '提出済' || monthStatus === '承認済');
+                    const isRejected = (monthStatus === '差戻し');
+                    
+                    document.getElementById('hist-status-badge').textContent = monthStatus;
+                    document.getElementById('hist-status-badge').className = 
+                        `px-2 py-1 text-xs rounded font-bold ${isRejected ? 'bg-red-100 text-red-600' : 'bg-gray-200'}`;
+
+                    if(isLocked) {
+                        document.getElementById('history-controls').classList.add('hidden');
+                        document.getElementById('history-hint').classList.add('hidden');
+                        document.getElementById('history-locked-msg').classList.remove('hidden');
+                    } else {
+                        document.getElementById('history-controls').classList.remove('hidden');
+                        document.getElementById('history-hint').classList.remove('hidden');
+                        document.getElementById('history-locked-msg').classList.add('hidden');
+                    }
+                    
+                    const weekDays = ['日','月','火','水','木','金','土'];
+                    
+                    if (res.carHistories.length === 0) {
+                        container.innerHTML = '<p class="text-center text-gray-500">履歴データがありません</p>';
+                    }
+
+                    res.carHistories.forEach((hist, carIdx) => {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'mb-8';
+                        wrapper.innerHTML = `<h3 class="font-bold text-lg mb-2 pl-2 border-l-4 border-blue-500">${hist.carNumber} の記録</h3>`;
+                        
+                        const exWrapper = document.createElement('div');
+                        exWrapper.className = 'excel-wrapper shadow-md';
+                        
+                        const table = document.createElement('table');
+                        table.className = 'excel-table';
+                        table.innerHTML = `
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" style="width:50px; z-index:21; left:0; position:sticky;"></th>
+                                    <th rowspan="2" style="width:70px;">日付</th>
+                                    <th rowspan="2" style="width:40px;">曜</th>
+                                    <th rowspan="2" style="width:180px;">行先</th>
+                                    <th rowspan="2" style="width:100px;">最終km</th>
+                                    <th rowspan="2" style="width:80px;">距離</th>
+                                    <th colspan="2">アルコール</th>
+                                    <th rowspan="2" style="width:70px;">給油(L)</th>
+                                    <th rowspan="2" style="width:150px;">備考</th>
+                                    <th rowspan="2" style="width:60px;">外観</th>
+                                    <th rowspan="2" style="width:60px;">清掃</th>
+                                    <th rowspan="2" style="width:60px;">不具合</th>
+                                </tr>
+                                <tr>
+                                    <th style="width:50px; top:38px;">開始</th>
+                                    <th style="width:50px; top:38px;">終了</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        `;
+                        
+                        const tbody = table.querySelector('tbody');
+                        
+                        hist.records.forEach((r, dayIdx) => {
+                            const tr = document.createElement('tr');
+                            r.isModified = false;
+                            
+                            if(r.isHoliday || r.dayOfWeek === 0) tr.classList.add('row-sunday');
+                            else if(r.dayOfWeek === 6) tr.classList.add('row-saturday');
+                            
+                            const dateObj = new Date(r.date);
+                            const dateDisp = dateObj.getDate() + '日';
+                            const weekDisp = weekDays[r.dayOfWeek];
+                            
+                            const createInput = (field, type='text', val) => {
+                                if(isLocked) return `<input class="cell-input cell-disabled" type="${type}" value="${val}" disabled>`;
+                                return `<input class="cell-input" id="inp-${carIdx}-${dayIdx}-${field}" type="${type}" value="${val}" onchange="onLocalChange(${carIdx}, ${dayIdx}, '${field}', this.value)">`;
+                            };
+                            const createToggle = (field, val, alertVal='異常あり') => {
+                                const displayVal = val || '未';
+                                const cls = (displayVal === '済' || displayVal === '異常なし' || displayVal === 'なし') ? 'val-done' : (displayVal === alertVal ? 'val-alert' : 'val-none');
+                                if(isLocked) return `<div class="cell-toggle cell-disabled ${cls}">${displayVal}</div>`;
+                                return `<div class="cell-toggle ${cls}" id="tog-${carIdx}-${dayIdx}-${field}" onclick="onLocalToggle(${carIdx}, ${dayIdx}, '${field}', '${alertVal}')">${displayVal}</div>`;
+                            };
+
+                            tr.innerHTML = `
+                                <td class="cell-date" style="left:0; position:sticky; background:inherit; z-index:19; border-right:2px solid #d1d5db;">
+                                    <button class="text-blue-500 text-xs" onclick="editRecord(${carIdx}, ${dayIdx})">編集</button>
+                                </td>
+                                <td class="cell-date">${dateDisp}</td>
+                                <td class="cell-date" style="${r.dayOfWeek===0||r.isHoliday?'color:red;':(r.dayOfWeek===6?'color:blue;':'')}">${weekDisp}</td>
+                                <td>${createInput('destination', 'text', r.destination)}</td>
+                                <td>${createInput('arrivalMeter', 'tel', r.arrivalMeter)}</td>
+                                <td class="text-right pr-2 font-bold text-blue-600" id="dist-${carIdx}-${dayIdx}">${r.distance}</td>
+                                <td>${createToggle('alcoholStart', r.alcoholStart)}</td>
+                                <td>${createToggle('alcoholEnd', r.alcoholEnd)}</td>
+                                <td>${createInput('refuel', 'tel', r.refuel)}</td>
+                                <td>${createInput('remarks', 'text', r.remarks)}</td>
+                                <td>${createToggle('dailyCheck', r.dailyCheck || '異常なし', '異常あり')}</td>
+                                <td>${createToggle('carCleaning', r.carCleaning, '未')}</td>
+                                <td>${createToggle('troubleStatus', r.troubleStatus || 'なし', 'あり')}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                        
+                        exWrapper.appendChild(table);
+                        wrapper.appendChild(exWrapper);
+                        container.appendChild(wrapper);
+                    });
+
+                } else {
+                    container.innerHTML = `<p class="text-center text-red-500 py-4">${res.message}</p>`;
+                }
+            }).getHistory(currentUser.userId, ym, extraCars);
+        }
+
+        function onLocalChange(carIdx, dayIdx, field, value) {
+            const r = carHistoriesCache[carIdx].records[dayIdx];
+            r[field] = value;
+            r.isModified = true;
+            document.getElementById(`inp-${carIdx}-${dayIdx}-${field}`).classList.add('cell-modified');
+            hasUnsavedChanges = true;
+            updateSaveButtonState();
+        }
+        
+        function onLocalToggle(carIdx, dayIdx, field, alertVal) {
+            const r = carHistoriesCache[carIdx].records[dayIdx];
+            const currentVal = r[field] || '未';
+            let newVal = '';
+            
+            if (field === 'dailyCheck') newVal = (currentVal === '異常なし') ? '異常あり' : '異常なし';
+            else if (field === 'troubleStatus') newVal = (currentVal === 'なし') ? 'あり' : 'なし';
+            else if (field === 'carCleaning') newVal = (currentVal === '済') ? '未' : '済';
+            else newVal = (currentVal === '済') ? '未' : '済'; 
+
+            r[field] = newVal;
+            r.isModified = true;
+            
+            const elem = document.getElementById(`tog-${carIdx}-${dayIdx}-${field}`);
+            elem.textContent = newVal;
+            const cls = (newVal === '済' || newVal === '異常なし' || newVal === 'なし') ? 'val-done' : (newVal === alertVal ? 'val-alert' : 'val-none');
+            elem.className = `cell-toggle cell-modified ${cls}`;
+            
+            hasUnsavedChanges = true;
+            updateSaveButtonState();
+        }
+        
+        function updateSaveButtonState() {
+            const btn = document.getElementById('btn-bulk-save');
+            if(hasUnsavedChanges) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.classList.add('animate-pulse');
+            } else {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.classList.remove('animate-pulse');
+            }
+        }
+
+        function saveBulk() {
+            if(!hasUnsavedChanges) return;
+            const updates = [];
+            carHistoriesCache.forEach(hist => {
+                hist.records.forEach(r => {
+                    if (r.isModified) updates.push(r);
+                });
+            });
+            if(updates.length === 0) return;
+            
+            showLoading();
+            google.script.run.withSuccessHandler(res => {
+                hideLoading();
+                if(res.success) {
+                    showToast('一括保存しました');
+                    loadHistory();
+                } else {
+                    alert('保存失敗: ' + res.message);
+                }
+            }).saveHistoryBulk(currentUser.userId, currentUser.name, updates);
+        }
+        
+        // 車両追加機能
+        function openAddCarModal() {
+            document.getElementById('add-car-select').innerHTML = '';
+            loadCarList('add-car-select', () => {
+                document.getElementById('add-car-modal').style.display = 'flex';
+            });
+        }
+        function closeAddCarModal() {
+            document.getElementById('add-car-modal').style.display = 'none';
+        }
+        function execAddCar() {
+            const carNum = document.getElementById('add-car-select').value;
+            if(!carNum) return;
+            
+            if(!extraCars.includes(carNum)) {
+                extraCars.push(carNum);
+                loadHistory(); // 再読み込み
+            }
+            closeAddCarModal();
+        }
+
+        // 単票入力（変更なしだが再掲）
+        function startDailyReport(dateStr) {
+            showScreen('arrival');
+            const targetDate = dateStr || new Date().toISOString().split('T')[0];
+            document.getElementById('record-id').value = '';
+            document.getElementById('arr-date').value = targetDate;
+            document.getElementById('arr-meter').value = '';
+            document.getElementById('arr-dest').value = '';
+            document.getElementById('arr-dist').textContent = '0';
+            document.getElementById('arr-remarks').value = '';
+            document.getElementById('arr-refuel').value = '';
+            document.getElementById('trouble-detail').style.display = 'none';
+            document.getElementById('trouble-detail').value = '';
+            
+            const setBtn = (id, active) => {
+                const b = document.getElementById(id);
+                if(active) b.classList.add('active'); else b.classList.remove('active');
+            };
+            setBtn('btn-alc-start', true); setBtn('btn-daily', true); setBtn('btn-alc-end', true); setBtn('btn-clean', true);
+            const btnTrouble = document.getElementById('btn-trouble');
+            btnTrouble.textContent = 'なし'; btnTrouble.classList.remove('active', 'trouble');
+
+            loadCarList('arr-car', () => {
+                const defCar = currentUser.carNumber;
+                if(defCar) document.getElementById('arr-car').value = defCar;
+                document.getElementById('arr-car').onchange = function() { updateDepMeter(this.value); };
+                updateDepMeter(document.getElementById('arr-car').value);
+            });
+        }
+        
+        function editRecord(carIdx, dayIdx) {
+            const r = carHistoriesCache[carIdx].records[dayIdx];
+            showScreen('arrival');
+            document.getElementById('record-id').value = r.id;
+            document.getElementById('arr-date').value = r.date;
+            
+            loadCarList('arr-car', () => {
+                document.getElementById('arr-car').value = r.carNumber;
+            });
+            document.getElementById('arr-dep-meter').value = r.departureMeter;
+            document.getElementById('arr-meter').value = r.arrivalMeter;
+            document.getElementById('arr-dist').textContent = r.distance;
+            document.getElementById('arr-dest').value = r.destination;
+            document.getElementById('arr-remarks').value = r.remarks;
+            document.getElementById('arr-refuel').value = r.refuel;
+            
+            const setBtn = (id, val, activeVal) => {
+                const b = document.getElementById(id);
+                if(val === activeVal) b.classList.add('active'); else b.classList.remove('active');
+            };
+            setBtn('btn-alc-start', r.alcoholStart, '済');
+            setBtn('btn-daily', r.dailyCheck, '異常なし');
+            setBtn('btn-alc-end', r.alcoholEnd, '済');
+            setBtn('btn-clean', r.carCleaning, '済');
+            
+            const btnTrouble = document.getElementById('btn-trouble');
+            const detail = document.getElementById('trouble-detail');
+            if(r.troubleStatus === 'あり') {
+                btnTrouble.textContent = 'あり';
+                btnTrouble.classList.add('active', 'trouble');
+                detail.style.display = 'block';
+                detail.value = r.troubleDetail;
+            } else {
+                btnTrouble.textContent = 'なし';
+                btnTrouble.classList.remove('active', 'trouble');
+                detail.style.display = 'none';
+            }
+        }
+
+        // その他（省略せず記載）
+        function loadCarList(elemId, callback) {
+            if(carListCache.length > 0) { renderCarSelect(elemId, carListCache); if(callback) callback(); return; }
+            google.script.run.withSuccessHandler(res => {
+                if(res.success) { carListCache = res.cars; renderCarSelect(elemId, res.cars); if(callback) callback(); }
+            }).getCarList();
+        }
+        function renderCarSelect(elemId, cars) {
+            const sel = document.getElementById(elemId); sel.innerHTML = '';
+            cars.forEach(c => { const op = document.createElement('option'); op.value = c.carNumber; op.textContent = c.carNumber; sel.appendChild(op); });
+        }
+        function updateDepMeter(carNum) {
+            google.script.run.withSuccessHandler(res => {
+                if(res.success) { document.getElementById('arr-dep-meter').value = res.lastMeter; calcDist(); }
+            }).getLastMeter(carNum);
+        }
+        function calcDist() {
+            const dep = parseFloat(document.getElementById('arr-dep-meter').value) || 0;
+            const arr = parseFloat(document.getElementById('arr-meter').value) || 0;
+            const dist = arr - dep;
+            document.getElementById('arr-dist').textContent = dist > 0 ? dist.toFixed(1) : '0';
+        }
+        function saveArrival() {
+            const getData = (id) => document.getElementById(id).value;
+            const isBtnActive = (id) => document.getElementById(id).classList.contains('active');
+            const data = {
+                id: getData('record-id'), userId: currentUser.userId, userName: currentUser.name,
+                date: getData('arr-date'), carNumber: getData('arr-car'),
+                departureMeter: getData('arr-dep-meter'), arrivalMeter: getData('arr-meter'),
+                destination: getData('arr-dest'),
+                alcoholCheckStart: isBtnActive('btn-alc-start')?'済':'未', dailyCheck: isBtnActive('btn-daily')?'異常なし':'異常あり',
+                alcoholCheckEnd: isBtnActive('btn-alc-end')?'済':'未', carCleaning: isBtnActive('btn-clean')?'済':'未',
+                troubleStatus: document.getElementById('btn-trouble').textContent==='あり'?'あり':'なし',
+                troubleDetail: getData('trouble-detail'), refuel: getData('arr-refuel'), remarks: getData('arr-remarks')
+            };
+            if(!data.arrivalMeter) return alert('帰着メーターを入力してください');
+            showLoading();
+            google.script.run.withSuccessHandler(res => {
+                hideLoading();
+                if(res.success) { showToast('保存しました'); showScreen('home'); } else { alert('保存失敗: ' + res.message); }
+            }).saveArrival(data);
+        }
+        
+        function doSubmitFromHistory() {
+            if(hasUnsavedChanges) { if(!confirm('未保存の変更があります。先に保存しますか？')) return; saveBulk(); return; }
+            if(!confirm('この月の記録をすべて提出しますか？')) return;
+            showLoading();
+            const ym = document.getElementById('hist-month').value;
+            google.script.run.withSuccessHandler(res => { hideLoading(); alert(res.message); loadHistory(); }).submitMonthly(currentUser.userId, ym);
+        }
+        
+        // 管理者画面
+        function loadAdminData() {
+            if(!currentUser || currentUser.role !== '管理者') return showScreen('home');
+            document.getElementById('admin-base-display').textContent = currentUser.adminBase ? currentUser.adminBase : '全拠点';
+            showLoading();
+            google.script.run.withSuccessHandler(res => {
+                hideLoading();
+                const container = document.getElementById('admin-list-container');
+                container.innerHTML = '';
+                if(res.success && res.list.length > 0) {
+                    res.list.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'card border-l-4 border-yellow-400';
+                        div.innerHTML = `
+                            <div class="flex justify-between items-start mb-2">
+                                <div><h3 class="font-extrabold text-xl">${item.userName}</h3><p class="text-gray-500 text-sm">${item.yearMonth} (${item.base})</p></div>
+                                <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-bold">${item.status}</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 mb-4 bg-gray-50 p-3 rounded">
+                                <div class="text-center"><span class="block text-xs text-gray-500">稼働日数</span><span class="font-bold text-lg">${item.workDays}日</span></div>
+                                <div class="text-center"><span class="block text-xs text-gray-500">走行距離</span><span class="font-bold text-lg">${Math.round(item.totalDistance)}km</span></div>
+                            </div>
+                            <div class="flex gap-3">
+                                <button onclick="doApprove('${item.userId}', '${item.yearMonth}')" class="btn btn-success h-12 text-base">承認</button>
+                                <button onclick="openRejectModal('${item.userId}', '${item.yearMonth}')" class="btn btn-danger h-12 text-base">差戻し</button>
+                            </div>
+                        `;
+                        container.appendChild(div);
+                    });
+                } else { container.innerHTML = '<p class="text-center py-8 text-gray-500">未承認のデータはありません</p>'; }
+            }).getAdminPendingList(currentUser.userId);
+        }
+        function doApprove(uid, ym) {
+            if(!confirm('承認しますか？')) return;
+            showLoading();
+            google.script.run.withSuccessHandler(res=>{ hideLoading(); alert(res.message); loadAdminData(); }).approveMonthly(currentUser.userId, currentUser.name, uid, ym);
+        }
+        function openRejectModal(uid, ym) { rejectTarget={userId:uid, ym:ym}; document.getElementById('reject-comment').value=''; document.getElementById('reject-modal').style.display='flex'; }
+        function closeRejectModal() { document.getElementById('reject-modal').style.display='none'; rejectTarget=null; }
+        function execReject() {
+            const c = document.getElementById('reject-comment').value;
+            if(!c) return alert('理由を入力');
+            showLoading();
+            google.script.run.withSuccessHandler(res=>{ hideLoading(); closeRejectModal(); alert(res.message); loadAdminData(); }).rejectMonthly(currentUser.userId, rejectTarget.userId, rejectTarget.ym, c);
+        }
+    </script>
+</body>
+</html>
