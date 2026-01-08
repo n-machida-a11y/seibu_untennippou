@@ -1,0 +1,4000 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.75, maximum-scale=3.0, user-scalable=yes">
+    <title>かんたん運転日報システム V2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        :root {
+            /* 統一的な余白システム */
+            --spacing-xs: 8px;
+            --spacing-sm: 12px;
+            --spacing-md: 16px;
+            --spacing-lg: 20px;
+            --spacing-xl: 24px;
+
+            /* コンポーネント用の余白（全デバイスで統一） */
+            --container-padding: 16px;
+            --card-padding: 16px;
+            --card-margin: 16px;
+            --gap-default: 12px;
+        }
+
+        /* モバイル専用の余白調整（画面を最大限活用） */
+        @media (max-width: 767px) {
+            :root {
+                --container-padding: 1.5vw;  /* 375px幅で約5.6px */
+                --card-padding: 1.5vw;
+                --card-margin: 1.5vw;  /* カード間の縦余白も最小化 */
+                --spacing-md: 1.5vw;
+                --spacing-sm: 1vw;  /* 375px幅で約3.75px */
+                --spacing-lg: 2vw;  /* 375px幅で約7.5px */
+                --spacing-xl: 2.5vw;  /* 375px幅で約9.4px */
+                --gap-default: 1vw; /* 375px幅で約3.75px */
+            }
+            .container-app {
+                max-width: none;  /* モバイルでは幅制限を解除 */
+                width: 100%;
+                padding-top: 1.5vw;  /* 上部余白も最小化 */
+                padding-bottom: 1.5vw;  /* 下部余白も最小化 */
+            }
+            .modal-overlay {
+                padding: 1vw;  /* モーダル外側の余白も最小化 */
+            }
+            .modal-content {
+                max-width: none;  /* モバイルではモーダルも画面幅いっぱいに */
+                width: 96vw;  /* 画面幅の96%（左右2vwずつ余白） */
+                padding: 2.5vw;  /* モーダル内部のパディング縮小 */
+            }
+            .header {
+                margin-bottom: 1.5vw;  /* ヘッダー下の余白を最小化 */
+                padding: 1.5vw 2vw;  /* ヘッダー内部のパディング縮小 */
+                border-radius: 8px;  /* 角丸を小さく */
+            }
+            .card {
+                border-radius: 8px;  /* カードの角丸を小さく */
+            }
+            /* Tailwindのmargin/paddingクラスを上書き */
+            .mb-1 { margin-bottom: 1vw !important; }
+            .mb-2 { margin-bottom: 1.5vw !important; }
+            .mb-3 { margin-bottom: 2vw !important; }
+            .mb-4 { margin-bottom: 2vw !important; }
+            .mb-6 { margin-bottom: 2.5vw !important; }
+            .mt-1 { margin-top: 1vw !important; }
+            .mt-2 { margin-top: 1.5vw !important; }
+            .mt-3 { margin-top: 2vw !important; }
+            .mt-4 { margin-top: 2vw !important; }
+            .mt-6 { margin-top: 2.5vw !important; }
+            .py-2 { padding-top: 1vw !important; padding-bottom: 1vw !important; }
+            .py-3 { padding-top: 1.5vw !important; padding-bottom: 1.5vw !important; }
+            .py-4 { padding-top: 2vw !important; padding-bottom: 2vw !important; }
+            .gap-3 { gap: 1.5vw !important; }
+            .gap-4 { gap: 2vw !important; }
+
+            /* 中高年向けのフォントサイズとボタンサイズの最適化 */
+            body {
+                font-size: 18px !important;  /* ベースフォントサイズを大きく */
+            }
+            .btn {
+                min-height: 60px !important;  /* ボタンを高く */
+                font-size: 22px !important;  /* ボタン文字を大きく */
+                font-weight: 700 !important;  /* より太く */
+                padding: 3vw 4vw !important;  /* ボタン内の余白を確保 */
+            }
+            .toggle-btn {
+                min-height: 60px !important;
+                font-size: 22px !important;
+                font-weight: 700 !important;
+                padding: 3vw 4vw !important;
+            }
+            input, select, textarea {
+                font-size: 22px !important;  /* 入力欄の文字を大きく */
+                min-height: 60px !important;  /* 入力欄を高く */
+                font-weight: 500 !important;  /* やや太く */
+            }
+            .label, label {
+                font-size: 19px !important;  /* ラベルを大きく */
+                font-weight: 600 !important;  /* 太く */
+                margin-bottom: 1.5vw !important;
+            }
+            /* テキストサイズの調整 */
+            .text-xs { font-size: 15px !important; }
+            .text-sm { font-size: 17px !important; font-weight: 500 !important; }
+            .text-base { font-size: 19px !important; font-weight: 500 !important; }
+            .text-lg { font-size: 21px !important; font-weight: 600 !important; }
+            .text-xl { font-size: 23px !important; font-weight: 600 !important; }
+            .text-2xl { font-size: 26px !important; font-weight: 700 !important; }
+            /* アイコンサイズを大きく */
+            i.fas, i.far {
+                font-size: 1.3em !important;  /* アイコンを1.3倍に */
+            }
+            /* 戻るボタンを特に大きく */
+            .btn i.fa-arrow-left {
+                font-size: 1.5em !important;
+                margin-right: 2vw !important;
+            }
+            /* モーダル内のボタンも大きく */
+            .modal-content .btn {
+                min-height: 65px !important;
+                font-size: 23px !important;
+            }
+        }
+
+        body {
+            font-size: 16px;
+            min-height: 100vh;
+            background: #f5f5f5;
+        }
+        .screen {
+            display: none;
+        }
+        .screen.active {
+            display: block;
+        }
+        input, select, textarea {
+            font-size: 20px !important;
+        }
+        .btn {
+            min-height: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .toggle-btn {
+            min-height: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            border: 2px solid #ddd;
+            transition: all 0.3s;
+        }
+        .toggle-btn.active {
+            border-color: #10b981;
+            background-color: #10b981;
+            color: white;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: var(--card-padding);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: var(--card-margin);
+        }
+        .container-app {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: var(--container-padding);
+            min-height: 100vh;
+        }
+        /* タブレット用 */
+        @media (min-width: 768px) and (max-width: 1023px) {
+            .container-app {
+                max-width: 100%;
+            }
+        }
+        /* デスクトップ用 */
+        @media (min-width: 1024px) {
+            .container-app {
+                max-width: 1200px;
+            }
+        }
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .input-field {
+            min-height: 50px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 10px 15px;
+            font-size: 20px;
+            width: 100%;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .label {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: block;
+            color: #374151;
+        }
+        .alert-box {
+            padding: var(--spacing-md);
+            border-radius: 10px;
+            margin-bottom: var(--spacing-md);
+            font-size: 16px;
+        }
+        .alert-warning {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            color: #92400e;
+        }
+        .alert-error {
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #991b1b;
+        }
+        .alert-info {
+            background-color: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            color: #1e40af;
+        }
+        .history-item {
+            border-left: 4px solid #3b82f6;
+            padding: var(--spacing-md);
+            background: #f9fafb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            height: 100%;
+        }
+        .history-item:active {
+            background: #f3f4f6;
+            transform: scale(0.98);
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+        }
+        .modal-overlay.active {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 50px;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: var(--spacing-lg);
+            max-width: 600px;
+            width: calc(100% - 24px);
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        @media (min-width: 768px) {
+            .modal-content {
+                max-width: 800px;
+                width: 100%;
+            }
+        }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-app">
+
+        <!-- 1. ログイン画面 -->
+        <div id="screen-login" class="screen active">
+            <div class="text-center mb-8 pt-10">
+                <i class="fas fa-car text-white text-6xl mb-4"></i>
+                <h1 class="text-white text-3xl font-bold mb-2">かんたん運転日報</h1>
+                <p class="text-white text-lg">V2.0</p>
+            </div>
+
+            <div class="card">
+                <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">ログイン</h2>
+
+                <div class="mb-6">
+                    <label class="label">お名前を入力または選択してください</label>
+                    <input id="login-user-input" list="user-list" type="text" class="input-field" placeholder="氏名を入力または選択" autocomplete="off">
+                    <datalist id="user-list">
+                    </datalist>
+                    <p class="text-xs text-gray-500 mt-2">※リストから選択するか、直接入力してください</p>
+                    <div id="user-count-indicator" class="text-xs text-green-600 mt-1" style="display:none;">
+                        <i class="fas fa-check-circle"></i>
+                        <span id="user-count-text">0人のユーザーが読み込まれました</span>
+                    </div>
+                </div>
+
+                <button onclick="doLogin()" class="btn w-full bg-blue-600 text-white hover:bg-blue-700">
+                    <i class="fas fa-sign-in-alt mr-2"></i>ログイン
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. ホーム画面 -->
+        <div id="screen-home" class="screen">
+            <div class="header">
+                <div class="flex justify-between items-center gap-3">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs sm:text-sm text-gray-600">ようこそ</p>
+                        <h2 id="home-user-name" class="text-lg sm:text-xl font-bold text-gray-800 truncate">読み込み中...</h2>
+                    </div>
+                    <button onclick="showScreen('login')" class="text-gray-600 hover:text-gray-800 flex-shrink-0">
+                        <i class="fas fa-sign-out-alt text-xl sm:text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 統計カード -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 今月の走行距離 -->
+                <div class="card bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                    <p class="text-sm opacity-90 mb-1">今月の走行距離</p>
+                    <p id="home-total-distance" class="text-4xl font-bold mb-1">0 km</p>
+                    <p id="home-year-month-period" class="text-sm opacity-90">読み込み中...</p>
+                </div>
+
+                <!-- 月次ステータス -->
+                <div class="card">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <p class="text-xs sm:text-sm text-gray-600">月次ステータス</p>
+                            <p class="text-base sm:text-lg font-bold text-green-600">
+                                <i class="fas fa-check-circle mr-2"></i>作成中
+                            </p>
+                        </div>
+                        <button onclick="showScreen('submit')" class="btn w-full sm:w-auto bg-yellow-500 text-white hover:bg-yellow-600">
+                            <i class="fas fa-paper-plane mr-2"></i>月次提出
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 今月の承認状況 -->
+                <div id="home-approval-status-card" class="card" style="display:none;">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-xs sm:text-sm text-gray-600 mb-1">今月の承認状況</p>
+                            <div id="home-approval-status-content">
+                                <!-- 動的生成 -->
+                            </div>
+                        </div>
+                        <i class="fas fa-clipboard-check text-3xl text-purple-600 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- メニューボタン -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                <button onclick="showScreen('departure')" class="btn w-full bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-between px-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-play-circle text-xl sm:text-2xl mr-2 sm:mr-3"></i>
+                        <span>出発・点検報告</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+
+                <button onclick="showScreen('arrival')" class="btn w-full bg-green-600 text-white hover:bg-green-700 flex items-center justify-between px-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-stop-circle text-xl sm:text-2xl mr-2 sm:mr-3"></i>
+                        <span>帰着・記録保存</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+
+                <button onclick="showScreen('history')" class="btn w-full bg-purple-600 text-white hover:bg-purple-700 flex items-center justify-between px-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-history text-xl sm:text-2xl mr-2 sm:mr-3"></i>
+                        <span>過去の履歴</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+
+                <button onclick="showScreen('admin')" class="btn w-full bg-gray-700 text-white hover:bg-gray-800 flex items-center justify-between px-6">
+                    <div class="flex items-center">
+                        <i class="fas fa-user-shield text-xl sm:text-2xl mr-2 sm:mr-3"></i>
+                        <span>管理者画面</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+
+                <!-- 従業員マスタ管理ボタン（管理者のみ表示） -->
+                <button id="btn-employee-master" onclick="showScreen('employee-master')" class="btn w-full bg-indigo-600 text-white hover:bg-indigo-700 flex items-center justify-between px-6" style="display: none;">
+                    <div class="flex items-center">
+                        <i class="fas fa-users text-xl sm:text-2xl mr-2 sm:mr-3"></i>
+                        <span>従業員マスタ管理</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+
+                <!-- 車両マスタ管理ボタン（管理者のみ表示） -->
+                <button id="btn-vehicle-master" onclick="showScreen('vehicle-master')" class="btn w-full bg-teal-600 text-white hover:bg-teal-700 flex items-center justify-between px-6" style="display: none;">
+                    <div class="flex items-center">
+                        <i class="fas fa-car-side text-xl sm:text-2xl mr-2 sm:mr-3"></i>
+                        <span>車両マスタ管理</span>
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. 出発・点検報告画面 -->
+        <div id="screen-departure" class="screen">
+            <div class="header">
+                <button onclick="showScreen('home')" class="text-gray-600 hover:text-gray-800 mb-2">
+                    <i class="fas fa-arrow-left mr-2"></i>戻る
+                </button>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800">出発・点検報告</h2>
+            </div>
+
+            <div class="alert-box alert-info">
+                <i class="fas fa-info-circle mr-2"></i>
+                出発前の点検を実施してください
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-calendar-alt mr-2 text-blue-600"></i>日付
+                </label>
+                <input id="departure-date" type="date" class="input-field">
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-car mr-2 text-blue-600"></i>車両選択
+                </label>
+                <select id="departure-car" class="input-field">
+                    <!-- 動的に生成される -->
+                </select>
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-tachometer-alt mr-2 text-blue-600"></i>出発メーター（km）
+                </label>
+                <input id="departure-meter" type="tel" class="input-field" placeholder="0">
+                <p class="text-sm text-gray-500 mt-2">※前回の帰着時の値が自動表示されます</p>
+            </div>
+
+            <div class="card">
+                <h3 class="label mb-4">
+                    <i class="fas fa-clipboard-check mr-2 text-blue-600"></i>開始前チェック
+                </h3>
+
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-sm font-bold mb-2">アルコールチェック</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="toggle-btn active">
+                                <i class="fas fa-check mr-2"></i>検査済
+                            </button>
+                            <button class="toggle-btn">
+                                <i class="fas fa-times mr-2"></i>未実施
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-bold mb-2">日常点検（タイヤ・ライト・ブレーキ・液類）</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="toggle-btn active">
+                                <i class="fas fa-check mr-2"></i>異常なし
+                            </button>
+                            <button class="toggle-btn">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>異常あり
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg" style="display: none;">
+                    <p class="text-sm text-red-700">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        異常がある場合は、運行管理者に連絡してください
+                    </p>
+                </div>
+            </div>
+
+            <!-- 一時保存エリア -->
+            <div id="departure-draft-notification" class="card" style="display: none;">
+                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p class="text-sm text-blue-700 mb-3">
+                        <i class="fas fa-info-circle mr-2"></i>前回の入力内容があります
+                    </p>
+                    <div class="flex gap-2">
+                        <button onclick="loadDepartureDraft()" class="btn flex-1 bg-blue-600 text-white hover:bg-blue-700">
+                            <i class="fas fa-undo mr-2"></i>復元する
+                        </button>
+                        <button onclick="discardDepartureDraft()" class="btn flex-1 bg-gray-500 text-white hover:bg-gray-600">
+                            <i class="fas fa-trash mr-2"></i>破棄する
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <button onclick="saveDepartureDraft()" class="btn w-full bg-gray-500 text-white hover:bg-gray-600 mb-3">
+                    <i class="fas fa-save mr-2"></i>一時保存（下書き）
+                </button>
+                <p id="departure-draft-status" class="text-sm text-center" style="display: none;">
+                    <i class="fas fa-check-circle text-green-600 mr-1"></i>
+                    <span class="text-green-600">一時保存しました</span>
+                </p>
+            </div>
+
+            <div class="card">
+                <button onclick="saveDeparture()" class="btn w-full bg-blue-600 text-white hover:bg-blue-700">
+                    <i class="fas fa-save mr-2"></i>出発を記録する
+                </button>
+            </div>
+        </div>
+
+        <!-- 4. 帰着・日報記録画面 -->
+        <div id="screen-arrival" class="screen">
+            <div class="header">
+                <button onclick="showScreen('home')" class="text-gray-600 hover:text-gray-800 mb-2">
+                    <i class="fas fa-arrow-left mr-2"></i>戻る
+                </button>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800">帰着・日報記録</h2>
+            </div>
+
+            <div class="alert-box alert-info">
+                <i class="fas fa-info-circle mr-2"></i>
+                本日の業務記録を入力してください
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-calendar-alt mr-2 text-green-600"></i>日付
+                </label>
+                <input id="arrival-date" type="date" class="input-field">
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-car mr-2 text-green-600"></i>使用車両
+                </label>
+                <select id="arrival-car" class="input-field">
+                    <!-- 動的に生成される -->
+                </select>
+            </div>
+
+            <div class="card">
+                <!-- 出発記録なし警告メッセージ -->
+                <div id="no-departure-warning" class="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg" style="display: none;">
+                    <p class="text-sm text-yellow-800">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <strong>警告：</strong>本日の出発記録が見つかりません。前回の帰着メーター値を使用しています。出発メーターを確認・修正してください。
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+                    <div>
+                        <label class="label">出発メーター（km）</label>
+                        <input id="arrival-departure-meter" type="tel" class="input-field" placeholder="0">
+                        <p class="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">※前回の帰着時の値が自動表示されます</p>
+                    </div>
+                    <div>
+                        <label class="label">
+                            <i class="fas fa-tachometer-alt mr-1 text-green-600"></i>帰着メーター
+                        </label>
+                        <input id="arrival-meter" type="tel" class="input-field" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 mb-1">本日の走行距離</p>
+                    <p id="arrival-distance-display" class="text-3xl font-bold text-blue-600">0 km</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-map-marker-alt mr-2 text-green-600"></i>行先
+                </label>
+                <textarea id="arrival-destination" class="input-field" rows="3" placeholder="訪問先や業務内容を入力してください&#10;例）大阪営業所 → 京都支店 → 顧客A社"></textarea>
+            </div>
+
+            <div class="card">
+                <h3 class="label mb-4">
+                    <i class="fas fa-clipboard-check mr-2 text-green-600"></i>終了後チェック
+                </h3>
+
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-sm font-bold mb-2">アルコールチェック（終了時）</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="toggle-btn active">
+                                <i class="fas fa-check mr-2"></i>検査済
+                            </button>
+                            <button class="toggle-btn">
+                                <i class="fas fa-times mr-2"></i>未実施
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-sm font-bold mb-2">車内清掃（ゴミ捨て等）</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="toggle-btn active">
+                                <i class="fas fa-check mr-2"></i>実施済
+                            </button>
+                            <button class="toggle-btn">
+                                <i class="fas fa-times mr-2"></i>未実施
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>不具合報告
+                </label>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <button id="trouble-none-btn" class="toggle-btn active" onclick="toggleTroubleDetail(false)">
+                        <i class="fas fa-check mr-2"></i>異常なし
+                    </button>
+     
+     
+                    <button id="trouble-yes-btn" class="toggle-btn" onclick="toggleTroubleDetail(true)">
+                        <i class="fas fa-tools mr-2"></i>不具合あり
+                    </button>
+                </div>
+
+                <div id="trouble-detail-area" style="display: none;">
+                    <textarea id="trouble-detail-textarea" class="input-field" rows="3" placeholder="不具合の詳細を入力してください"></textarea>
+                </div>
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-gas-pump mr-2 text-green-600"></i>給油（リットル）
+                </label>
+                <input type="tel" class="input-field" placeholder="0">
+                <p class="text-sm text-gray-500 mt-2">※給油した場合のみ入力してください</p>
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-comment mr-2 text-gray-600"></i>備考
+                </label>
+                <textarea class="input-field" rows="2" placeholder="その他の連絡事項があれば入力してください"></textarea>
+            </div>
+
+            <!-- 一時保存エリア -->
+            <div id="arrival-draft-notification" class="card" style="display: none;">
+                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p class="text-sm text-blue-700 mb-3">
+                        <i class="fas fa-info-circle mr-2"></i>前回の入力内容があります
+                    </p>
+                    <div class="flex gap-2">
+                        <button onclick="loadArrivalDraft()" class="btn flex-1 bg-blue-600 text-white hover:bg-blue-700">
+                            <i class="fas fa-undo mr-2"></i>復元する
+                        </button>
+                        <button onclick="discardArrivalDraft()" class="btn flex-1 bg-gray-500 text-white hover:bg-gray-600">
+                            <i class="fas fa-trash mr-2"></i>破棄する
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <button onclick="saveArrivalDraft()" class="btn w-full bg-gray-500 text-white hover:bg-gray-600 mb-3">
+                    <i class="fas fa-save mr-2"></i>一時保存（下書き）
+                </button>
+                <p id="arrival-draft-status" class="text-sm text-center" style="display: none;">
+                    <i class="fas fa-check-circle text-green-600 mr-1"></i>
+                    <span class="text-green-600">一時保存しました</span>
+                </p>
+            </div>
+
+            <div class="card">
+                <button onclick="saveArrival()" class="btn w-full bg-green-600 text-white hover:bg-green-700">
+                    <i class="fas fa-save mr-2"></i>記録を保存する
+                </button>
+            </div>
+
+            <div class="alert-box alert-warning">
+                <i class="fas fa-info-circle mr-2"></i>
+                出発記録がない場合でも保存できます（救済措置）
+            </div>
+        </div>
+
+        <!-- 5. 履歴・閲覧画面 -->
+        <div id="screen-history" class="screen">
+            <div class="header">
+                <button onclick="showScreen('home')" class="text-gray-600 hover:text-gray-800 mb-2">
+                    <i class="fas fa-arrow-left mr-2"></i>戻る
+                </button>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800">過去の履歴</h2>
+            </div>
+
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-calendar-alt mr-2 text-purple-600"></i>月度選択
+                </label>
+                <select id="history-month-select" class="input-field">
+                    <!-- 動的に生成される -->
+                </select>
+            </div>
+
+            <div class="card">
+                <div class="bg-blue-50 p-3 sm:p-4 rounded-lg mb-4">
+                    <div class="grid grid-cols-2 gap-3 sm:gap-4">
+                        <div>
+                            <p class="text-xs sm:text-sm text-gray-600">稼働日数</p>
+                            <p id="history-work-days" class="text-xl sm:text-2xl font-bold text-blue-600">0日</p>
+                        </div>
+                        <div>
+                            <p class="text-xs sm:text-sm text-gray-600">合計距離</p>
+                            <p id="history-total-distance" class="text-xl sm:text-2xl font-bold text-blue-600">0km</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="approval-status-summary" class="mb-4" style="display:none;">
+                    <p class="text-sm font-bold mb-2 text-gray-700">
+                        <i class="fas fa-clipboard-check mr-2 text-purple-600"></i>承認状況
+                    </p>
+                    <div id="approval-status-content" class="bg-purple-50 p-3 sm:p-4 rounded-lg border-2 border-purple-200">
+                        <!-- 動的に生成される -->
+                    </div>
+                </div>
+
+                <p class="text-sm font-bold mb-3 text-gray-700">記録一覧</p>
+
+                <div id="history-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <!-- 動的に生成される -->
+                    <p class="text-center text-gray-500 py-4">読み込み中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. 月次一括提出画面 -->
+        <div id="screen-submit" class="screen">
+            <div class="header">
+                <button onclick="showScreen('home')" class="text-gray-600 hover:text-gray-800 mb-2">
+                    <i class="fas fa-arrow-left mr-2"></i>戻る
+                </button>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800">月次一括提出</h2>
+            </div>
+
+            <!-- 年月選択 -->
+            <div class="card">
+                <label class="label">
+                    <i class="fas fa-calendar-alt mr-2 text-blue-600"></i>提出する年月度を選択
+                </label>
+                <select id="submit-year-month" class="input-field" onchange="loadSubmitData()">
+                    <!-- 年月度が動的に生成される -->
+                </select>
+            </div>
+
+            <div class="card">
+                <h3 id="submit-title" class="text-lg font-bold mb-4 text-center">読み込み中...</h3>
+                <p id="submit-period" class="text-center text-gray-600 mb-4">-</p>
+
+                <div class="bg-gradient-to-r from-yellow-50 to-orange-50 p-3 sm:p-4 rounded-lg mb-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
+                        <div>
+                            <p class="text-xs sm:text-sm text-gray-600">稼働日数</p>
+                            <p id="submit-work-days" class="text-xl sm:text-2xl font-bold text-yellow-700">0日</p>
+                        </div>
+                        <div>
+                            <p class="text-xs sm:text-sm text-gray-600">合計距離</p>
+                            <p id="submit-total-distance" class="text-xl sm:text-2xl font-bold text-yellow-700">0km</p>
+                        </div>
+                        <div>
+                            <p class="text-xs sm:text-sm text-gray-600">レコード数</p>
+                            <p id="submit-record-count" class="text-xl sm:text-2xl font-bold text-yellow-700">0件</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="submit-warning-area">
+                    <!-- 警告メッセージがここに表示される -->
+                </div>
+
+                <div id="submit-missing-dates-area" class="space-y-2 mb-4">
+                    <!-- 未入力日がここに表示される -->
+                </div>
+
+                <div class="border-t pt-4 mb-4">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" class="w-6 h-6 mr-3">
+                        <span class="text-sm">上記の内容を確認し、提出します</span>
+                    </label>
+                </div>
+
+                <button onclick="submitMonthly()" class="btn w-full bg-yellow-500 text-white hover:bg-yellow-600">
+                    <i class="fas fa-paper-plane mr-2"></i>月次日報を提出する
+                </button>
+
+                <p class="text-xs text-gray-500 text-center mt-3">
+                    ※提出後は内容の編集ができなくなります
+                </p>
+            </div>
+        </div>
+
+        <!-- 7. 管理者承認画面 -->
+        <div id="screen-admin" class="screen">
+            <div class="header">
+                <button onclick="showScreen('home')" class="text-gray-600 hover:text-gray-800 mb-2">
+                    <i class="fas fa-arrow-left mr-2"></i>戻る
+                </button>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800">管理者承認画面</h2>
+            </div>
+
+            <div class="card">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-lg">未承認一覧</h3>
+                    <button class="btn bg-blue-600 text-white text-sm px-4 py-2">
+                        <i class="fas fa-download mr-2"></i>CSV
+                    </button>
+                </div>
+
+                <div id="admin-list-container" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- ここに未承認一覧が動的に生成される -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. 従業員マスタ管理画面 -->
+        <div id="screen-employee-master" class="screen">
+            <div class="header">
+                <button onclick="showScreen('home')" class="text-gray-600 hover:text-gray-800 mb-2">
+                    <i class="fas fa-arrow-left mr-2"></i>戻る
+                </button>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800">従業員マスタ管理</h2>
+            </div>
+
+            <div class="alert-box alert-info">
+                <i class="fas fa-info-circle mr-2"></i>
+                従業員の追加・編集・削除が可能です
+            </div>
+
+            <!-- 追加ボタン -->
+            <div class="mb-4">
+                <button onclick="showEmployeeForm('add')" class="btn w-full bg-blue-600 text-white hover:bg-blue-700">
+                    <i class="fas fa-plus mr-2"></i>新規従業員を追加
+                </button>
+            </div>
+
+            <!-- 従業員一覧 -->
+            <div id="employee-list-container" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- ここに従業員一覧が動的に生成される -->
+            </div>
+
+        </div>
+
+        <!-- 従業員編集モーダル -->
+        <div id="employee-form-modal" class="modal-overlay" onclick="handleModalBackgroundClick(event, 'employee')">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold" id="employee-form-title">従業員登録</h3>
+                    <button onclick="hideEmployeeForm()" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="label">ユーザーID（必須）</label>
+                        <input type="text" id="employee-userId" class="input-field" placeholder="U001">
+                        <p class="text-xs text-gray-500 mt-1">※編集時は変更できません</p>
+                    </div>
+
+                    <div>
+                        <label class="label">氏名（必須）</label>
+                        <input type="text" id="employee-name" class="input-field" placeholder="山田太郎">
+                    </div>
+
+                    <div>
+                        <label class="label">担当車両</label>
+                        <select id="employee-car" class="input-field">
+                            <option value="">未割り当て</option>
+                            <!-- 車両一覧が動的に生成される -->
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="label">権限</label>
+                        <select id="employee-role" class="input-field">
+                            <option value="使用者">使用者</option>
+                            <option value="管理者">管理者</option>
+                        </select>
+                        <p class="text-xs text-red-600 mt-1">※管理者権限の付与は慎重に行ってください</p>
+                    </div>
+
+                    <div>
+                        <label class="label">有効/無効</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="setEmployeeActive(true)" id="employee-active-btn" class="toggle-btn active">
+                                <i class="fas fa-check mr-2"></i>有効
+                            </button>
+                            <button onclick="setEmployeeActive(false)" id="employee-inactive-btn" class="toggle-btn">
+                                <i class="fas fa-times mr-2"></i>無効
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 space-y-2">
+                    <button onclick="saveEmployee()" class="btn w-full bg-green-600 text-white hover:bg-green-700">
+                        <i class="fas fa-save mr-2"></i>保存する
+                    </button>
+                    <button onclick="hideEmployeeForm()" class="btn w-full bg-gray-400 text-white hover:bg-gray-500">
+                        <i class="fas fa-times mr-2"></i>キャンセル
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 9. 車両マスタ管理画面 -->
+        <div id="screen-vehicle-master" class="screen">
+            <div class="header">
+                <button onclick="showScreen('home')" class="text-gray-600 hover:text-gray-800 mb-2">
+                    <i class="fas fa-arrow-left mr-2"></i>戻る
+                </button>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800">車両マスタ管理</h2>
+            </div>
+
+            <div class="alert-box alert-info">
+                <i class="fas fa-info-circle mr-2"></i>
+                車両の追加・編集・削除が可能です
+            </div>
+
+            <!-- 追加ボタン -->
+            <div class="mb-4">
+                <button onclick="showVehicleForm('add')" class="btn w-full bg-blue-600 text-white hover:bg-blue-700">
+                    <i class="fas fa-plus mr-2"></i>新規車両を追加
+                </button>
+            </div>
+
+            <!-- 車両一覧 -->
+            <div id="vehicle-list-container" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- ここに車両一覧が動的に生成される -->
+            </div>
+
+        </div>
+
+        <!-- 車両編集モーダル -->
+        <div id="vehicle-form-modal" class="modal-overlay" onclick="handleModalBackgroundClick(event, 'vehicle')">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold" id="vehicle-form-title">車両登録</h3>
+                    <button onclick="hideVehicleForm()" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="label">車番（必須）</label>
+                        <input type="text" id="vehicle-carNumber" class="input-field" placeholder="大阪333あ1234">
+                        <p class="text-xs text-gray-500 mt-1">※編集時は変更できません</p>
+                    </div>
+
+                    <div>
+                        <label class="label">車種（必須）</label>
+                        <input type="text" id="vehicle-carType" class="input-field" placeholder="プリウス">
+                    </div>
+
+                    <div>
+                        <label class="label">最終メーター（km）</label>
+                        <input type="tel" id="vehicle-lastMeter" class="input-field" placeholder="15000">
+                        <p class="text-xs text-gray-500 mt-1">※初期値を設定してください</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 space-y-2">
+                    <button onclick="saveVehicle()" class="btn w-full bg-green-600 text-white hover:bg-green-700">
+                        <i class="fas fa-save mr-2"></i>保存する
+                    </button>
+                    <button onclick="hideVehicleForm()" class="btn w-full bg-gray-400 text-white hover:bg-gray-500">
+                        <i class="fas fa-times mr-2"></i>キャンセル
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 履歴詳細モーダル -->
+        <div id="history-detail-modal" class="modal-overlay" onclick="handleModalBackgroundClick(event, 'history-detail')">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold">運転日報詳細</h3>
+                    <button onclick="hideHistoryDetail()" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+
+                <div id="history-detail-content" class="space-y-4">
+                    <!-- 詳細内容がJavaScriptで動的に挿入されます -->
+                </div>
+
+                <div class="mt-6">
+                    <button onclick="hideHistoryDetail()" class="btn w-full bg-gray-400 text-white hover:bg-gray-500">
+                        <i class="fas fa-times mr-2"></i>閉じる
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ローディングオーバーレイ -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- 差戻しコメント入力モーダル -->
+    <div id="reject-comment-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">差戻し理由を入力</h3>
+                <button onclick="hideRejectCommentModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+
+            <div class="alert-box alert-warning">
+                <i class="fas fa-info-circle mr-2"></i>
+                差戻し理由や修正指示を記入してください。従業員側で確認できます。
+            </div>
+
+            <div class="mb-4">
+                <label class="label">差戻しコメント</label>
+                <textarea id="reject-comment-text" class="input-field" rows="4" placeholder="例：3/25の走行距離が異常に大きいため、メーター値を再確認してください。"></textarea>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="hideRejectCommentModal()" class="btn flex-1 bg-gray-500 text-white hover:bg-gray-600">
+                    <i class="fas fa-times mr-2"></i>キャンセル
+                </button>
+                <button onclick="confirmReject()" class="btn flex-1 bg-red-600 text-white hover:bg-red-700">
+                    <i class="fas fa-undo mr-2"></i>差戻しを確定
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===========================================
+        // モーダル関連ユーティリティ
+        // ===========================================
+
+        /**
+         * モーダルの背景クリック処理
+         */
+        function handleModalBackgroundClick(event, type) {
+            // クリックされたのがオーバーレイ自身の場合のみ閉じる
+            if (event.target.classList.contains('modal-overlay')) {
+                if (type === 'employee') {
+                    hideEmployeeForm();
+                } else if (type === 'vehicle') {
+                    hideVehicleForm();
+                } else if (type === 'history-detail') {
+                    hideHistoryDetail();
+                }
+            }
+        }
+
+        // ===========================================
+        // グローバル変数
+        // ===========================================
+        let currentUser = null;
+        let currentDate = new Date();
+        let currentYearMonth = '';
+        let selectedRecord = null;
+
+        // データキャッシュ
+        let dataCache = {
+            carList: null,
+            employeeList: null,
+            vehicleList: null,
+            historyData: {},
+            monthlyDistance: {}
+        };
+
+        // マスタ管理用の変数
+        let employeeFormMode = 'add'; // 'add' or 'edit'
+        let selectedEmployee = null;
+        let vehicleFormMode = 'add'; // 'add' or 'edit'
+        let selectedVehicle = null;
+        let employeeActiveFlag = true;
+
+        // ===========================================
+        // ユーティリティ関数
+        // ===========================================
+
+        /**
+         * 画面切り替え機能
+         */
+        function showScreen(screenName) {
+            const screens = document.querySelectorAll('.screen');
+            screens.forEach(screen => {
+                screen.classList.remove('active');
+            });
+
+            const targetScreen = document.getElementById('screen-' + screenName);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+                window.scrollTo(0, 0);
+
+                // 画面表示時の初期化処理
+                if (screenName === 'home') {
+                    loadHomeData();
+                } else if (screenName === 'departure') {
+                    loadDepartureData();
+                } else if (screenName === 'arrival') {
+                    loadArrivalData();
+                } else if (screenName === 'history') {
+                    loadHistoryData();
+                } else if (screenName === 'submit') {
+                    initSubmitScreen();
+                } else if (screenName === 'admin') {
+                    loadAdminData();
+                } else if (screenName === 'employee-master') {
+                    loadEmployeeMasterData();
+                } else if (screenName === 'vehicle-master') {
+                    loadVehicleMasterData();
+                }
+            }
+        }
+
+        /**
+         * ローディング表示
+         */
+        function showLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.add('active');
+            }
+        }
+
+        /**
+         * ローディング非表示
+         */
+        function hideLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
+        }
+
+        /**
+         * データキャッシュをクリア
+         */
+        function clearCache(type) {
+            if (type === 'all') {
+                dataCache = {
+                    carList: null,
+                    employeeList: null,
+                    vehicleList: null,
+                    historyData: {},
+                    monthlyDistance: {}
+                };
+            } else if (type === 'history') {
+                dataCache.historyData = {};
+                dataCache.monthlyDistance = {};
+            } else if (type === 'cars') {
+                dataCache.carList = null;
+            } else if (type === 'employees') {
+                dataCache.employeeList = null;
+            } else if (type === 'vehicles') {
+                dataCache.vehicleList = null;
+            }
+        }
+
+        /**
+         * エラーメッセージ表示
+         */
+        function showError(message) {
+            alert('エラー: ' + message);
+        }
+
+        /**
+         * 成功メッセージ表示
+         */
+        function showSuccess(message) {
+            alert(message);
+        }
+
+        /**
+         * LocalStorageにユーザー情報を保存
+         */
+        function saveUserToLocal(user) {
+            localStorage.setItem('currentUser', JSON.stringify(user));
+        }
+
+        /**
+         * LocalStorageからユーザー情報を取得
+         */
+        function loadUserFromLocal() {
+            const userStr = localStorage.getItem('currentUser');
+            if (userStr) {
+                return JSON.parse(userStr);
+            }
+            return null;
+        }
+
+        /**
+         * ログアウト
+         */
+        function logout() {
+            localStorage.removeItem('currentUser');
+            currentUser = null;
+            showScreen('login');
+        }
+
+        // ===========================================
+        // ログイン機能
+        // ===========================================
+
+        /**
+         * ユーザー一覧を読み込み
+         */
+        function loadUserList() {
+            console.log('Loading user list...');
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('User list response:', result);
+                    if (result.success) {
+                        const datalist = document.getElementById('user-list');
+                        console.log('Datalist element:', datalist);
+                        console.log('Number of users:', result.users.length);
+                        datalist.innerHTML = '';
+                        result.users.forEach(user => {
+                            const option = document.createElement('option');
+                            option.value = user.name;
+                            datalist.appendChild(option);
+                        });
+                        console.log('Datalist populated with', datalist.children.length, 'options');
+
+                        // ユーザー数表示インジケーター
+                        const indicator = document.getElementById('user-count-indicator');
+                        const countText = document.getElementById('user-count-text');
+                        if (indicator && countText && result.users.length > 0) {
+                            countText.textContent = result.users.length + '人のユーザーが読み込まれました';
+                            indicator.style.display = 'block';
+                        }
+                    } else {
+                        console.error('Failed to load users:', result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('ユーザー一覧取得エラー:', error);
+                })
+                .getUserList();
+        }
+
+        /**
+         * ログイン処理
+         */
+        function doLogin() {
+            const userInput = document.getElementById('login-user-input');
+            const userName = userInput.value.trim();
+
+            if (!userName) {
+                showError('氏名を入力してください');
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        currentUser = result.user;
+                        // 期限切れの一時保存データを削除
+                        cleanupExpiredDrafts();
+                        showSuccess('ログインしました');
+                        showScreen('home');
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('ログインに失敗しました: ' + error.message);
+                })
+                .login(userName);
+        }
+
+        // ===========================================
+        // ホーム画面
+        // ===========================================
+
+        function loadHomeData() {
+            if (!currentUser) return;
+
+            // ユーザー名表示
+            const userNameElem = document.getElementById('home-user-name');
+            if (userNameElem) {
+                userNameElem.textContent = currentUser.name + ' さん';
+            }
+
+            // 管理者のみマスタ管理ボタンを表示
+            const isAdmin = currentUser.role === '管理者';
+            const employeeBtn = document.getElementById('btn-employee-master');
+            const vehicleBtn = document.getElementById('btn-vehicle-master');
+            if (employeeBtn) employeeBtn.style.display = isAdmin ? 'block' : 'none';
+            if (vehicleBtn) vehicleBtn.style.display = isAdmin ? 'block' : 'none';
+
+            // 現在の年月度を計算
+            const today = new Date();
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    currentYearMonth = result.yearMonth;
+
+                    // 年月度の期間を表示
+                    const period = result.period;
+                    const yearMonthDisplay = formatYearMonth(result.yearMonth, period);
+                    const yearMonthElement = document.getElementById('home-year-month-period');
+                    if (yearMonthElement) {
+                        yearMonthElement.textContent = yearMonthDisplay;
+                    }
+
+                    // 月間走行距離を取得
+                    loadMonthlyDistance();
+
+                    // 承認状況を取得
+                    loadHomeApprovalStatus();
+                })
+                .withFailureHandler(function(error) {
+                    console.error('年月度取得エラー:', error);
+                })
+                .testGetCurrentYearMonth();
+        }
+
+        /**
+         * 年月度を表示用にフォーマット
+         * 例: "2025-12" → "2025年12月度（11/21〜12/20）"
+         */
+        function formatYearMonth(yearMonth, period) {
+            const [year, month] = yearMonth.split('-');
+            const startDate = period.start.split('-').slice(1).join('/'); // "2025-11-21" → "11/21"
+            const endDate = period.end.split('-').slice(1).join('/'); // "2025-12-20" → "12/20"
+            return `${year}年${parseInt(month)}月度（${startDate}〜${endDate}）`;
+        }
+
+        function loadMonthlyDistance() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        const distanceElement = document.getElementById('home-total-distance');
+                        if (distanceElement) {
+                            distanceElement.textContent = result.totalDistance.toLocaleString() + ' km';
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('月間走行距離取得エラー:', error);
+                })
+                .getMonthlyDistance(currentUser.userId, currentYearMonth);
+        }
+
+        function loadHomeApprovalStatus() {
+            if (!currentUser || !currentYearMonth) return;
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success && result.records) {
+                        displayHomeApprovalStatus(result.records);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('承認状況取得エラー:', error);
+                })
+                .getHistory(currentUser.userId, currentYearMonth);
+        }
+
+        function displayHomeApprovalStatus(records) {
+            const card = document.getElementById('home-approval-status-card');
+            const content = document.getElementById('home-approval-status-content');
+
+            if (!card || !content) return;
+
+            const rejectedRecords = records.filter(r => r.status === '差戻し' || r.status === 'REJECTED');
+
+            if (rejectedRecords.length > 0) {
+                // 差戻しがある場合は警告表示
+                content.innerHTML = `
+                    <div class="bg-red-100 border-2 border-red-300 rounded-lg p-3">
+                        <p class="text-base sm:text-lg font-bold text-red-800 mb-1">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>差戻しあり（${rejectedRecords.length}件）
+                        </p>
+                        <p class="text-xs sm:text-sm text-red-700">修正が必要です。履歴画面で確認してください。</p>
+                    </div>
+                `;
+                card.style.display = 'block';
+            } else {
+                const approvedCount = records.filter(r => r.status === '承認済' || r.status === 'APPROVED').length;
+                const submittedCount = records.filter(r => r.status === '提出済' || r.status === 'SUBMITTED').length;
+
+                if (approvedCount === records.length && records.length > 0) {
+                    content.innerHTML = `
+                        <p class="text-base sm:text-lg font-bold text-purple-600">
+                            <i class="fas fa-check-circle mr-2"></i>全件承認済み
+                        </p>
+                    `;
+                    card.style.display = 'block';
+                } else if (submittedCount > 0) {
+                    content.innerHTML = `
+                        <p class="text-base sm:text-lg font-bold text-blue-600">
+                            <i class="fas fa-clock mr-2"></i>承認待ち（${submittedCount}件）
+                        </p>
+                    `;
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            }
+        }
+
+        // ===========================================
+        // ユーティリティ：今日の日付を取得（YYYY-MM-DD形式）
+        // ===========================================
+        function getTodayString() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // ===========================================
+        // 出発・点検画面
+        // ===========================================
+
+        function loadDepartureData() {
+            if (!currentUser) return;
+
+            // 今日の日付を初期値として設定
+            const departureDateInput = document.getElementById('departure-date');
+            if (departureDateInput) {
+                departureDateInput.value = getTodayString();
+            }
+
+            // キャッシュがあればそれを使用
+            if (dataCache.carList) {
+                populateCarSelect(dataCache.carList);
+            } else {
+                // 車両一覧を読み込み
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        if (result.success) {
+                            dataCache.carList = result.cars;
+                            populateCarSelect(result.cars);
+                        }
+                    })
+                    .withFailureHandler(function(error) {
+                        console.error('車両一覧取得エラー:', error);
+                    })
+                    .getCarList();
+            }
+
+            // 車両選択変更時に前回メーターを取得
+            const carSelect = document.getElementById('departure-car');
+            if (carSelect && !carSelect.dataset.listenerAdded) {
+                carSelect.addEventListener('change', function() {
+                    loadLastMeter(this.value);
+                });
+                carSelect.dataset.listenerAdded = 'true';
+            }
+
+            // 一時保存データの復元通知をチェック
+            checkAndShowDraftNotification('departure');
+        }
+
+        function populateCarSelect(cars) {
+            const select = document.getElementById('departure-car');
+            if (!select) return;
+
+            select.innerHTML = '';
+            cars.forEach(car => {
+                const option = document.createElement('option');
+                option.value = car.carNumber;
+                option.textContent = car.carNumber + '（' + car.carType + '）';
+                select.appendChild(option);
+            });
+
+            // 担当車両を初期選択
+            if (currentUser.carNumber) {
+                select.value = currentUser.carNumber;
+                loadLastMeter(currentUser.carNumber);
+            }
+        }
+
+        function loadLastMeter(carNumber) {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        const meterInput = document.getElementById('departure-meter');
+                        if (meterInput) {
+                            meterInput.value = result.lastMeter;
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('前回メーター取得エラー:', error);
+                })
+                .getLastMeter(carNumber);
+        }
+
+        function saveDeparture() {
+            const departureDate = document.getElementById('departure-date').value;
+            const carNumber = document.getElementById('departure-car').value;
+            const departureMeter = document.getElementById('departure-meter').value;
+            const alcoholCheck = document.querySelector('#screen-departure .toggle-btn.active').textContent.includes('検査済') ? '済' : '未';
+            const dailyCheck = document.querySelector('#screen-departure .space-y-4 > div:nth-child(2) .toggle-btn.active').textContent.includes('異常なし') ? '異常なし' : '異常あり';
+
+            if (!departureDate) {
+                showError('日付を選択してください');
+                return;
+            }
+
+            if (!carNumber) {
+                showError('車両を選択してください');
+                return;
+            }
+
+            if (!departureMeter) {
+                showError('出発メーターを入力してください');
+                return;
+            }
+
+            if (dailyCheck === '異常あり') {
+                showError('異常がある場合は、運行管理者に連絡してください');
+                return;
+            }
+
+            const data = {
+                date: departureDate,
+                userId: currentUser.userId,
+                userName: currentUser.name,
+                carNumber: carNumber,
+                departureMeter: parseFloat(departureMeter),
+                alcoholCheckStart: alcoholCheck,
+                dailyCheck: dailyCheck
+            };
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        // 一時保存データを削除
+                        clearDraft('departure', currentUser.userId, departureDate);
+                        // キャッシュをクリア
+                        clearCache('history');
+                        showSuccess(result.message);
+                        // 即座に画面遷移
+                        showScreen('home');
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('出発記録の保存に失敗しました: ' + error.message);
+                })
+                .saveDeparture(data);
+        }
+
+        // ===========================================
+        // 一時保存機能
+        // ===========================================
+
+        // 一時保存の有効期限（日数）
+        const DRAFT_EXPIRY_DAYS = 7;
+
+        /**
+         * 一時保存データのlocalStorageキーを生成
+         */
+        function getDraftKey(type, userId, date) {
+            return `draft_${type}_${userId}_${date}`;
+        }
+
+        /**
+         * 一時保存データの存在チェック
+         */
+        function hasDraft(type, userId, date) {
+            try {
+                const key = getDraftKey(type, userId, date);
+                const dataStr = localStorage.getItem(key);
+
+                if (!dataStr) {
+                    return false;
+                }
+
+                const data = JSON.parse(dataStr);
+
+                // 期限チェック
+                const now = new Date().getTime();
+                const expiryTime = data.timestamp + (DRAFT_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+                if (now > expiryTime) {
+                    // 期限切れの場合は削除
+                    localStorage.removeItem(key);
+                    return false;
+                }
+
+                return true;
+            } catch (e) {
+                console.error('一時保存データのチェックエラー:', e);
+                return false;
+            }
+        }
+
+        /**
+         * 一時保存データの削除
+         */
+        function clearDraft(type, userId, date) {
+            try {
+                const key = getDraftKey(type, userId, date);
+                localStorage.removeItem(key);
+                console.log('一時保存データを削除しました:', key);
+            } catch (e) {
+                console.error('一時保存データの削除エラー:', e);
+            }
+        }
+
+        /**
+         * 期限切れ一時保存データの自動削除
+         */
+        function cleanupExpiredDrafts() {
+            try {
+                const now = new Date().getTime();
+                const keysToRemove = [];
+
+                // localStorageの全キーをチェック
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+
+                    // draft_ で始まるキーのみ処理
+                    if (key && key.startsWith('draft_')) {
+                        try {
+                            const dataStr = localStorage.getItem(key);
+                            const data = JSON.parse(dataStr);
+
+                            // 期限チェック
+                            const expiryTime = data.timestamp + (DRAFT_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+                            if (now > expiryTime) {
+                                keysToRemove.push(key);
+                            }
+                        } catch (e) {
+                            // パースエラーの場合も削除対象
+                            keysToRemove.push(key);
+                        }
+                    }
+                }
+
+                // 期限切れデータを削除
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                    console.log('期限切れデータを削除:', key);
+                });
+
+                if (keysToRemove.length > 0) {
+                    console.log(`${keysToRemove.length}件の期限切れデータを削除しました`);
+                }
+            } catch (e) {
+                console.error('期限切れデータの削除エラー:', e);
+            }
+        }
+
+        /**
+         * 出発記録の一時保存
+         */
+        function saveDepartureDraft() {
+            if (!currentUser) {
+                showError('ログインしていません');
+                return;
+            }
+
+            const departureDate = document.getElementById('departure-date').value;
+            const carNumber = document.getElementById('departure-car').value;
+            const departureMeter = document.getElementById('departure-meter').value;
+
+            if (!departureDate) {
+                showError('日付を選択してください');
+                return;
+            }
+
+            // トグルボタンの状態を取得
+            const alcoholCheckBtn = document.querySelector('#screen-departure .toggle-btn.active');
+            const dailyCheckBtn = document.querySelector('#screen-departure .space-y-4 > div:nth-child(2) .toggle-btn.active');
+
+            const alcoholCheck = alcoholCheckBtn ? (alcoholCheckBtn.textContent.includes('検査済') ? '済' : '未') : '未';
+            const dailyCheck = dailyCheckBtn ? (dailyCheckBtn.textContent.includes('異常なし') ? '異常なし' : '異常あり') : '異常なし';
+
+            const draftData = {
+                userId: currentUser.userId,
+                date: departureDate,
+                timestamp: new Date().getTime(),
+                formData: {
+                    carNumber: carNumber,
+                    departureMeter: departureMeter,
+                    alcoholCheckStart: alcoholCheck,
+                    dailyCheck: dailyCheck
+                }
+            };
+
+            try {
+                const key = getDraftKey('departure', currentUser.userId, departureDate);
+                localStorage.setItem(key, JSON.stringify(draftData));
+
+                // 保存完了フィードバック
+                const statusElement = document.getElementById('departure-draft-status');
+                statusElement.style.display = 'block';
+
+                // 3秒後に非表示
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 3000);
+
+                console.log('出発記録を一時保存しました:', key);
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    showError('一時保存容量が不足しています。古いデータを削除してください。');
+                    cleanupExpiredDrafts();
+                } else {
+                    showError('一時保存に失敗しました: ' + e.message);
+                }
+            }
+        }
+
+        /**
+         * 帰着記録の一時保存
+         */
+        function saveArrivalDraft() {
+            if (!currentUser) {
+                showError('ログインしていません');
+                return;
+            }
+
+            const arrivalDate = document.getElementById('arrival-date').value;
+            const carNumber = document.getElementById('arrival-car').value;
+            const departureMeter = document.getElementById('arrival-departure-meter').value;
+            const arrivalMeter = document.getElementById('arrival-meter').value;
+            const destination = document.getElementById('arrival-destination')?.value || '';
+
+            if (!arrivalDate) {
+                showError('日付を選択してください');
+                return;
+            }
+
+            // 備考の取得
+            const textareas = document.querySelectorAll('#screen-arrival textarea');
+            const remarks = textareas[2] ? textareas[2].value : '';
+
+            // トグルボタンの状態を取得
+            const cards = document.querySelectorAll('#screen-arrival .card');
+            let alcoholEnd = '済';
+            let carCleaning = '済';
+
+            if (cards[2]) {
+                const alcoholBtn = cards[2].querySelectorAll('.toggle-btn.active')[0];
+                if (alcoholBtn) {
+                    alcoholEnd = alcoholBtn.textContent.includes('検査済') ? '済' : '未';
+                }
+                const cleaningBtn = cards[2].querySelectorAll('.toggle-btn.active')[1];
+                if (cleaningBtn) {
+                    carCleaning = cleaningBtn.textContent.includes('実施済') ? '済' : '未';
+                }
+            }
+
+            // 不具合報告の状態を取得
+            const troubleYesBtn = document.getElementById('trouble-yes-btn');
+            let troubleStatus = 'なし';
+            if (troubleYesBtn && troubleYesBtn.classList.contains('active')) {
+                troubleStatus = 'あり';
+            }
+
+            // 不具合詳細を取得
+            const troubleDetailTextarea = document.getElementById('trouble-detail-textarea');
+            const troubleDetail = troubleDetailTextarea ? troubleDetailTextarea.value : '';
+
+            // 給油の取得
+            const refuel = cards[4] ? (cards[4].querySelector('input[type="tel"]')?.value || '0') : '0';
+
+            const draftData = {
+                userId: currentUser.userId,
+                date: arrivalDate,
+                timestamp: new Date().getTime(),
+                formData: {
+                    carNumber: carNumber,
+                    departureMeter: departureMeter,
+                    arrivalMeter: arrivalMeter,
+                    destination: destination,
+                    alcoholCheckEnd: alcoholEnd,
+                    carCleaning: carCleaning,
+                    troubleStatus: troubleStatus,
+                    troubleDetail: troubleDetail,
+                    refuel: refuel,
+                    remarks: remarks
+                }
+            };
+
+            try {
+                const key = getDraftKey('arrival', currentUser.userId, arrivalDate);
+                localStorage.setItem(key, JSON.stringify(draftData));
+
+                // 保存完了フィードバック
+                const statusElement = document.getElementById('arrival-draft-status');
+                statusElement.style.display = 'block';
+
+                // 3秒後に非表示
+                setTimeout(() => {
+                    statusElement.style.display = 'none';
+                }, 3000);
+
+                console.log('帰着記録を一時保存しました:', key);
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    showError('一時保存容量が不足しています。古いデータを削除してください。');
+                    cleanupExpiredDrafts();
+                } else {
+                    showError('一時保存に失敗しました: ' + e.message);
+                }
+            }
+        }
+
+        /**
+         * 出発記録の復元
+         */
+        function loadDepartureDraft() {
+            if (!currentUser) return;
+
+            const departureDate = document.getElementById('departure-date').value;
+
+            if (!departureDate) {
+                showError('日付を選択してください');
+                return;
+            }
+
+            try {
+                const key = getDraftKey('departure', currentUser.userId, departureDate);
+                const dataStr = localStorage.getItem(key);
+
+                if (!dataStr) {
+                    showError('一時保存データが見つかりません');
+                    return;
+                }
+
+                const data = JSON.parse(dataStr);
+                const formData = data.formData;
+
+                // フォームに値を復元
+                if (formData.carNumber) {
+                    document.getElementById('departure-car').value = formData.carNumber;
+                }
+
+                if (formData.departureMeter) {
+                    document.getElementById('departure-meter').value = formData.departureMeter;
+                }
+
+                // トグルボタンの状態を復元（アルコールチェック）
+                const alcoholBtns = document.querySelectorAll('#screen-departure .toggle-btn');
+                alcoholBtns.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (formData.alcoholCheckStart === '済' && btn.textContent.includes('検査済')) {
+                        btn.classList.add('active');
+                    } else if (formData.alcoholCheckStart === '未' && btn.textContent.includes('未実施')) {
+                        btn.classList.add('active');
+                    }
+                });
+
+                // トグルボタンの状態を復元（日常点検）
+                const dailyCheckBtns = document.querySelectorAll('#screen-departure .space-y-4 > div:nth-child(2) .toggle-btn');
+                dailyCheckBtns.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (formData.dailyCheck === '異常なし' && btn.textContent.includes('異常なし')) {
+                        btn.classList.add('active');
+                    } else if (formData.dailyCheck === '異常あり' && btn.textContent.includes('異常あり')) {
+                        btn.classList.add('active');
+                    }
+                });
+
+                // 復元通知を非表示
+                document.getElementById('departure-draft-notification').style.display = 'none';
+
+                console.log('出発記録を復元しました:', key);
+            } catch (e) {
+                showError('復元に失敗しました: ' + e.message);
+            }
+        }
+
+        /**
+         * 出発記録の一時保存データを破棄
+         */
+        function discardDepartureDraft() {
+            if (!currentUser) return;
+
+            const departureDate = document.getElementById('departure-date').value;
+
+            if (!departureDate) {
+                return;
+            }
+
+            clearDraft('departure', currentUser.userId, departureDate);
+
+            // 復元通知を非表示
+            document.getElementById('departure-draft-notification').style.display = 'none';
+        }
+
+        /**
+         * 帰着記録の復元
+         */
+        function loadArrivalDraft() {
+            if (!currentUser) return;
+
+            const arrivalDate = document.getElementById('arrival-date').value;
+
+            if (!arrivalDate) {
+                showError('日付を選択してください');
+                return;
+            }
+
+            try {
+                const key = getDraftKey('arrival', currentUser.userId, arrivalDate);
+                const dataStr = localStorage.getItem(key);
+
+                if (!dataStr) {
+                    showError('一時保存データが見つかりません');
+                    return;
+                }
+
+                const data = JSON.parse(dataStr);
+                const formData = data.formData;
+
+                // フォームに値を復元
+                if (formData.carNumber) {
+                    document.getElementById('arrival-car').value = formData.carNumber;
+                }
+
+                if (formData.departureMeter) {
+                    document.getElementById('arrival-departure-meter').value = formData.departureMeter;
+                }
+
+                if (formData.arrivalMeter) {
+                    document.getElementById('arrival-meter').value = formData.arrivalMeter;
+                }
+
+                if (formData.destination) {
+                    document.getElementById('arrival-destination').value = formData.destination;
+                }
+
+                // 備考を復元
+                const textareas = document.querySelectorAll('#screen-arrival textarea');
+                if (textareas[2] && formData.remarks) {
+                    textareas[2].value = formData.remarks;
+                }
+
+                // トグルボタンの状態を復元（アルコールチェック・車内清掃）
+                const cards = document.querySelectorAll('#screen-arrival .card');
+
+                if (cards[2]) {
+                    const toggleBtns = cards[2].querySelectorAll('.toggle-btn');
+
+                    // アルコールチェック（終了時）
+                    const alcoholBtns = [toggleBtns[0], toggleBtns[1]];
+                    alcoholBtns.forEach(btn => {
+                        if (btn) {
+                            btn.classList.remove('active');
+                            if (formData.alcoholCheckEnd === '済' && btn.textContent.includes('検査済')) {
+                                btn.classList.add('active');
+                            } else if (formData.alcoholCheckEnd === '未' && btn.textContent.includes('未実施')) {
+                                btn.classList.add('active');
+                            }
+                        }
+                    });
+
+                    // 車内清掃
+                    const cleaningBtns = [toggleBtns[2], toggleBtns[3]];
+                    cleaningBtns.forEach(btn => {
+                        if (btn) {
+                            btn.classList.remove('active');
+                            if (formData.carCleaning === '済' && btn.textContent.includes('実施済')) {
+                                btn.classList.add('active');
+                            } else if (formData.carCleaning === '未' && btn.textContent.includes('未実施')) {
+                                btn.classList.add('active');
+                            }
+                        }
+                    });
+                }
+
+                // 不具合報告を復元
+                const troubleNoneBtn = document.getElementById('trouble-none-btn');
+                const troubleYesBtn = document.getElementById('trouble-yes-btn');
+
+                if (troubleNoneBtn && troubleYesBtn) {
+                    troubleNoneBtn.classList.remove('active');
+                    troubleYesBtn.classList.remove('active');
+
+                    if (formData.troubleStatus === 'あり') {
+                        troubleYesBtn.classList.add('active');
+                    } else {
+                        troubleNoneBtn.classList.add('active');
+                    }
+                }
+
+                // 不具合詳細を復元
+                const troubleDetailTextarea = document.getElementById('trouble-detail-textarea');
+                if (troubleDetailTextarea && formData.troubleDetail) {
+                    troubleDetailTextarea.value = formData.troubleDetail;
+                }
+
+                // 給油を復元
+                if (cards[4] && formData.refuel) {
+                    const refuelInput = cards[4].querySelector('input[type="tel"]');
+                    if (refuelInput) {
+                        refuelInput.value = formData.refuel;
+                    }
+                }
+
+                // 走行距離を再計算
+                calculateDistance();
+
+                // 復元通知を非表示
+                document.getElementById('arrival-draft-notification').style.display = 'none';
+
+                console.log('帰着記録を復元しました:', key);
+            } catch (e) {
+                showError('復元に失敗しました: ' + e.message);
+            }
+        }
+
+        /**
+         * 帰着記録の一時保存データを破棄
+         */
+        function discardArrivalDraft() {
+            if (!currentUser) return;
+
+            const arrivalDate = document.getElementById('arrival-date').value;
+
+            if (!arrivalDate) {
+                return;
+            }
+
+            clearDraft('arrival', currentUser.userId, arrivalDate);
+
+            // 復元通知を非表示
+            document.getElementById('arrival-draft-notification').style.display = 'none';
+        }
+
+        /**
+         * 復元通知の表示判定
+         */
+        function checkAndShowDraftNotification(type) {
+            if (!currentUser) return;
+
+            const dateInput = type === 'departure'
+                ? document.getElementById('departure-date')
+                : document.getElementById('arrival-date');
+
+            const date = dateInput ? dateInput.value : null;
+
+            if (!date) return;
+
+            const notificationId = type === 'departure'
+                ? 'departure-draft-notification'
+                : 'arrival-draft-notification';
+
+            // 一時保存データの存在チェック
+            if (hasDraft(type, currentUser.userId, date)) {
+                document.getElementById(notificationId).style.display = 'block';
+            } else {
+                document.getElementById(notificationId).style.display = 'none';
+            }
+        }
+
+        // ===========================================
+        // 帰着・日報記録画面
+        // ===========================================
+
+        function loadArrivalData() {
+            if (!currentUser) return;
+
+            // 今日の日付を初期値として設定
+            const arrivalDateInput = document.getElementById('arrival-date');
+            if (arrivalDateInput) {
+                arrivalDateInput.value = getTodayString();
+            }
+
+            // 車両リストを読み込む
+            loadCarListForArrival();
+
+            // 帰着メーター入力時に走行距離を自動計算
+            const arrivalMeterInput = document.getElementById('arrival-meter');
+            if (arrivalMeterInput && !arrivalMeterInput.dataset.listenerAdded) {
+                arrivalMeterInput.addEventListener('input', function() {
+                    calculateDistance();
+                });
+                arrivalMeterInput.dataset.listenerAdded = 'true';
+            }
+
+            // 出発メーター入力時にも走行距離を自動計算（編集可能になったため）
+            const departureMeterInput = document.getElementById('arrival-departure-meter');
+            if (departureMeterInput && !departureMeterInput.dataset.listenerAdded) {
+                departureMeterInput.addEventListener('input', function() {
+                    calculateDistance();
+                });
+                departureMeterInput.dataset.listenerAdded = 'true';
+            }
+
+            // 日付変更時に出発記録を再読み込み
+            if (arrivalDateInput && !arrivalDateInput.dataset.listenerAdded) {
+                arrivalDateInput.addEventListener('change', function() {
+                    const selectedCar = document.getElementById('arrival-car').value;
+                    loadArrivalDepartureMeter(this.value, selectedCar);
+                });
+                arrivalDateInput.dataset.listenerAdded = 'true';
+            }
+
+            // 車両選択時に出発メーターを取得
+            const carSelect = document.getElementById('arrival-car');
+            if (carSelect && !carSelect.dataset.listenerAdded) {
+                carSelect.addEventListener('change', function() {
+                    const selectedDate = document.getElementById('arrival-date').value;
+                    loadArrivalDepartureMeter(selectedDate, this.value);
+                });
+                carSelect.dataset.listenerAdded = 'true';
+            }
+
+            // 一時保存データの復元通知をチェック
+            checkAndShowDraftNotification('arrival');
+        }
+
+        /**
+         * 指定された日付の出発記録を読み込む
+         */
+        function loadDepartureRecordForDate(dateString) {
+            if (!currentUser) return;
+
+            // 本日の出発記録があるか確認して、あれば出発メーターを表示
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success && result.records.length > 0) {
+                        // 指定された日付の記録をすべてフィルタリング
+                        const dateRecords = result.records.filter(record => record.date === dateString);
+
+                        // 同じ日付の記録が複数ある場合、最新のもの（タイムスタンプが最大）を取得
+                        let targetRecord = null;
+                        if (dateRecords.length > 0) {
+                            targetRecord = dateRecords.reduce((latest, current) => {
+                                return (current.timestamp > latest.timestamp) ? current : latest;
+                            });
+                        }
+
+                        const arrivalCarInput = document.getElementById('arrival-car');
+                        const arrivalDepartureMeterInput = document.getElementById('arrival-departure-meter');
+
+                        if (targetRecord) {
+                            // 出発記録が見つかった場合
+                            if (arrivalCarInput) {
+                                arrivalCarInput.value = targetRecord.carNumber + '（' + (targetRecord.carType || '') + '）';
+                            }
+                            if (arrivalDepartureMeterInput) {
+                                arrivalDepartureMeterInput.value = targetRecord.departureMeter;
+                            }
+                            console.log('出発記録を読み込みました:', targetRecord);
+                        } else {
+                            // 出発記録がない場合はクリア
+                            if (arrivalCarInput) {
+                                arrivalCarInput.value = currentUser.carNumber ? (currentUser.carNumber + '（担当車両）') : '';
+                            }
+                            if (arrivalDepartureMeterInput) {
+                                arrivalDepartureMeterInput.value = '0';
+                            }
+                            console.log('指定日付の出発記録が見つかりません:', dateString);
+                        }
+                    } else {
+                        // 記録がない場合
+                        console.log('出発記録がありません');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('出発記録取得エラー:', error);
+                })
+                .getHistory(currentUser.userId, currentYearMonth);
+        }
+
+        /**
+         * 帰着画面用：車両リストを読み込む
+         */
+        function loadCarListForArrival() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        populateArrivalCarSelect(result.cars);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('車両一覧取得エラー:', error);
+                })
+                .getCarList();
+        }
+
+        /**
+         * 帰着画面の車両セレクトボックスに車両リストを設定
+         */
+        function populateArrivalCarSelect(cars) {
+            const select = document.getElementById('arrival-car');
+            if (!select) return;
+
+            select.innerHTML = '';
+            cars.forEach(car => {
+                const option = document.createElement('option');
+                option.value = car.carNumber;
+                option.textContent = car.carNumber + '（' + car.carType + '）';
+                select.appendChild(option);
+            });
+
+            // 担当車両を初期選択
+            if (currentUser.carNumber) {
+                select.value = currentUser.carNumber;
+            }
+
+            // 初期選択された車両の出発メーターを取得
+            const selectedDate = document.getElementById('arrival-date').value;
+            const selectedCar = select.value;
+            if (selectedDate && selectedCar) {
+                loadArrivalDepartureMeter(selectedDate, selectedCar);
+            }
+        }
+
+        /**
+         * 帰着画面：指定日付と車両の出発メーターを取得
+         * 出発登録と同じ仕様：常に前回の帰着メーターを自動取得
+         */
+        function loadArrivalDepartureMeter(dateString, carNumber) {
+            if (!currentUser || !dateString || !carNumber) return;
+
+            // 車番からカッコ内の車種を除去（例：「大阪333あ1234（プリウス）」→「大阪333あ1234」）
+            const extractedCarNumber = carNumber.includes('（') ? carNumber.split('（')[0].trim() : carNumber;
+
+            // 常に前回の帰着メーターを取得（出発登録と同じ仕様）
+            loadLastMeterForArrival(extractedCarNumber);
+
+            // 並行して出発記録の存在確認を行い、警告表示を制御
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    const warningDiv = document.getElementById('no-departure-warning');
+
+                    if (result.success && result.records.length > 0) {
+                        // 指定された日付と車両の記録をフィルタリング
+                        const matchingRecords = result.records.filter(record =>
+                            record.date === dateString && record.carNumber === extractedCarNumber
+                        );
+
+                        if (matchingRecords.length > 0) {
+                            // 出発記録がある場合は警告を非表示
+                            if (warningDiv) {
+                                warningDiv.style.display = 'none';
+                            }
+                            console.log('出発記録が存在します');
+                        } else {
+                            // 出発記録がない場合は警告を表示
+                            if (warningDiv) {
+                                warningDiv.style.display = 'block';
+                            }
+                            console.log('出発記録がありません - 警告を表示');
+                        }
+                    } else {
+                        // 記録がない場合は警告を表示
+                        if (warningDiv) {
+                            warningDiv.style.display = 'block';
+                        }
+                        console.log('出発記録がありません - 警告を表示');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('出発記録確認エラー:', error);
+                    // エラー時も警告を表示
+                    const warningDiv = document.getElementById('no-departure-warning');
+                    if (warningDiv) {
+                        warningDiv.style.display = 'block';
+                    }
+                })
+                .getHistory(currentUser.userId, currentYearMonth);
+        }
+
+        /**
+         * 帰着画面：前回の帰着メーターを取得
+         */
+        function loadLastMeterForArrival(carNumber) {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        const meterInput = document.getElementById('arrival-departure-meter');
+                        if (meterInput) {
+                            meterInput.value = result.lastMeter;
+                            console.log('前回の帰着メーターを読み込みました:', result.lastMeter);
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('前回メーター取得エラー:', error);
+                })
+                .getLastMeter(carNumber);
+        }
+
+        /**
+         * 不具合報告の詳細入力欄を表示/非表示
+         */
+        function toggleTroubleDetail(hasTrouble) {
+            const detailArea = document.getElementById('trouble-detail-area');
+            const noneBtn = document.getElementById('trouble-none-btn');
+            const yesBtn = document.getElementById('trouble-yes-btn');
+
+            if (hasTrouble) {
+                // 不具合ありを選択
+                detailArea.style.display = 'block';
+                noneBtn.classList.remove('active');
+                yesBtn.classList.add('active');
+            } else {
+                // 異常なしを選択
+                detailArea.style.display = 'none';
+                noneBtn.classList.add('active');
+                yesBtn.classList.remove('active');
+                // 詳細入力欄をクリア
+                document.getElementById('trouble-detail-textarea').value = '';
+            }
+        }
+
+        function calculateDistance() {
+            const departureMeter = parseFloat(document.getElementById('arrival-departure-meter').value) || 0;
+            const arrivalMeter = parseFloat(document.getElementById('arrival-meter').value) || 0;
+            const distance = arrivalMeter - departureMeter;
+
+            const distanceDisplay = document.getElementById('arrival-distance-display');
+            if (distanceDisplay) {
+                if (distance >= 0) {
+                    distanceDisplay.textContent = distance + ' km';
+                } else {
+                    distanceDisplay.textContent = '入力エラー';
+                }
+            }
+        }
+
+        function saveArrival() {
+            // ユーザー情報の確認
+            if (!currentUser) {
+                showError('ログインしていません。ログイン画面に戻ります。');
+                showScreen('login');
+                return;
+            }
+
+            // 日付の取得
+            const arrivalDate = document.getElementById('arrival-date').value;
+
+            // 車両番号の取得（selectのvalueは車番そのもの）
+            const carNumber = document.getElementById('arrival-car').value;
+
+            if (!carNumber) {
+                showError('車両を選択してください');
+                return;
+            }
+
+            const departureMeter = document.getElementById('arrival-departure-meter').value;
+            const arrivalMeter = document.getElementById('arrival-meter').value;
+            const destination = document.getElementById('arrival-destination')?.value || '';
+
+            // 備考のtextareaを取得
+            const textareas = document.querySelectorAll('#screen-arrival textarea');
+            const remarks = textareas[2] ? textareas[2].value : '';
+
+            // トグルボタンの状態を取得（activeクラスがついているボタンのテキストを確認）
+            const cards = document.querySelectorAll('#screen-arrival .card');
+
+            // 終了後チェックのカード（3番目のカード）からトグルボタンを取得
+            let alcoholEnd = '済';
+            let carCleaning = '済';
+            if (cards[2]) {
+                const alcoholBtn = cards[2].querySelectorAll('.toggle-btn.active')[0];
+                if (alcoholBtn) {
+                    alcoholEnd = alcoholBtn.textContent.includes('検査済') ? '済' : '未';
+                }
+                const cleaningBtn = cards[2].querySelectorAll('.toggle-btn.active')[1];
+                if (cleaningBtn) {
+                    carCleaning = cleaningBtn.textContent.includes('実施済') ? '済' : '未';
+                }
+            }
+
+            // 不具合報告をIDベースで取得（より確実）
+            const troubleNoneBtn = document.getElementById('trouble-none-btn');
+            const troubleYesBtn = document.getElementById('trouble-yes-btn');
+            let troubleStatus = 'なし';
+            if (troubleYesBtn && troubleYesBtn.classList.contains('active')) {
+                troubleStatus = 'あり';
+            }
+
+            // 不具合詳細をIDベースで取得
+            const troubleDetailTextarea = document.getElementById('trouble-detail-textarea');
+            const troubleDetail = troubleDetailTextarea ? troubleDetailTextarea.value : '';
+
+            // 給油のカード（5番目のカード）から入力値を取得
+            const refuel = cards[4] ? (cards[4].querySelector('input[type="tel"]')?.value || '0') : '0';
+
+            // デバッグ用ログ
+            console.log('不具合報告の状態:', {
+                troubleStatus: troubleStatus,
+                troubleDetail: troubleDetail,
+                troubleYesBtnActive: troubleYesBtn?.classList.contains('active'),
+                troubleNoneBtnActive: troubleNoneBtn?.classList.contains('active')
+            });
+
+            // バリデーション：不足している項目を全てチェック
+            const errors = [];
+
+            if (!arrivalDate || arrivalDate === '') {
+                errors.push('・日付を選択してください');
+            }
+
+            if (!carNumber || carNumber === '') {
+                errors.push('・車両情報が取得できません。出発記録を先に登録してください。');
+            }
+
+            // 出発メーターのバリデーション
+            if (!departureMeter || departureMeter.trim() === '') {
+                errors.push('・出発メーターを入力してください');
+            } else if (isNaN(parseFloat(departureMeter))) {
+                errors.push('・出発メーターは数値で入力してください');
+            }
+
+            if (!arrivalMeter || arrivalMeter.trim() === '') {
+                errors.push('・帰着メーターを入力してください');
+            } else if (isNaN(parseFloat(arrivalMeter))) {
+                errors.push('・帰着メーターは数値で入力してください');
+            } else if (!isNaN(parseFloat(departureMeter))) {
+                const departure = parseFloat(departureMeter);
+                const arrival = parseFloat(arrivalMeter);
+                if (arrival < departure) {
+                    errors.push('・帰着メーターは出発メーター以上の値を入力してください');
+                }
+            }
+
+            if (!destination || destination.trim() === '') {
+                errors.push('・行先を入力してください');
+            }
+
+            if (alcoholEnd !== '済') {
+                errors.push('・アルコールチェック（終了時）を「検査済」にしてください');
+            }
+
+            if (carCleaning !== '済') {
+                errors.push('・車内清掃を「実施済」にしてください');
+            }
+
+            // 不具合ありの場合のみ、詳細入力をチェック
+            if (troubleStatus === 'あり' && (!troubleDetail || troubleDetail.trim() === '')) {
+                errors.push('・不具合の詳細を入力してください');
+            }
+
+            // エラーがある場合は全て表示
+            if (errors.length > 0) {
+                const errorMessage = '以下の項目を確認してください：\n\n' + errors.join('\n');
+                showError(errorMessage);
+                return;
+            }
+
+            const data = {
+                date: arrivalDate,
+                userId: currentUser.userId,
+                userName: currentUser.name,
+                carNumber: carNumber,
+                departureMeter: parseFloat(departureMeter) || 0,
+                arrivalMeter: parseFloat(arrivalMeter),
+                destination: destination,
+                alcoholCheckEnd: alcoholEnd,
+                carCleaning: carCleaning,
+                troubleStatus: troubleStatus,
+                troubleDetail: troubleDetail,
+                refuel: parseFloat(refuel) || 0,
+                remarks: remarks
+            };
+
+            console.log('Saving arrival data:', data); // デバッグ用
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        // 一時保存データを削除
+                        clearDraft('arrival', currentUser.userId, arrivalDate);
+                        // キャッシュをクリア
+                        clearCache('history');
+                        showSuccess(result.message);
+                        // 即座に画面遷移
+                        showScreen('home');
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('帰着記録の保存に失敗しました: ' + error.message);
+                })
+                .saveArrival(data);
+        }
+
+        // ===========================================
+        // 履歴画面
+        // ===========================================
+
+        /**
+         * 履歴画面の初期化
+         */
+        function loadHistoryData() {
+            if (!currentUser) return;
+
+            // 月度選択ボックスを初期化
+            initMonthSelect();
+
+            // 履歴データを読み込み
+            loadHistoryForMonth(currentYearMonth);
+        }
+
+        /**
+         * 月度選択ボックスを初期化（過去6ヶ月分）
+         */
+        function initMonthSelect() {
+            const select = document.getElementById('history-month-select');
+            if (!select) return;
+
+            select.innerHTML = '';
+
+            const today = new Date();
+            for (let i = 0; i < 6; i++) {
+                const targetDate = new Date(today.getFullYear(), today.getMonth() - i, today.getDate());
+                const yearMonth = calculateYearMonthJS(targetDate);
+                const period = getMonthPeriodJS(yearMonth);
+
+                const option = document.createElement('option');
+                option.value = yearMonth;
+                option.textContent = formatYearMonthDisplay(yearMonth, period);
+                if (i === 0) option.selected = true;
+                select.appendChild(option);
+            }
+
+            // 月度変更時のイベントリスナー
+            if (!select.dataset.listenerAdded) {
+                select.addEventListener('change', function() {
+                    currentYearMonth = this.value;
+                    loadHistoryForMonth(this.value);
+                });
+                select.dataset.listenerAdded = 'true';
+            }
+        }
+
+        /**
+         * 指定月度の履歴を読み込み
+         */
+        function loadHistoryForMonth(yearMonth) {
+            console.log('履歴読み込み開始:', { yearMonth: yearMonth, userId: currentUser.userId });
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('履歴取得結果:', result);
+
+                    if (result.success) {
+                        console.log('取得したレコード数:', result.records ? result.records.length : 0);
+                        displayHistoryList(result.records);
+                        calculateHistorySummary(result.records);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('履歴取得エラー:', error);
+                    const container = document.getElementById('history-list-container');
+                    if (container) {
+                        container.innerHTML = '<p class="text-center text-red-500 py-4">データの読み込みに失敗しました</p>';
+                    }
+                })
+                .getHistory(currentUser.userId, yearMonth);
+        }
+
+        /**
+         * 履歴一覧を表示
+         */
+        function displayHistoryList(records) {
+            const container = document.getElementById('history-list-container');
+            if (!container) {
+                console.error('history-list-container要素が見つかりません');
+                return;
+            }
+
+            console.log('displayHistoryList呼び出し:', records);
+
+            if (!records || records.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-4">この月度の記録はありません</p>';
+                // 承認状況サマリーを非表示
+                const approvalSummary = document.getElementById('approval-status-summary');
+                if (approvalSummary) approvalSummary.style.display = 'none';
+                return;
+            }
+
+            // 承認状況サマリーを表示
+            displayApprovalStatusSummary(records);
+
+            // 日付で降順ソート（新しい順）- エラーハンドリング付き
+            const sortedRecords = records.sort((a, b) => {
+                try {
+                    const dateA = a.date ? new Date(a.date) : new Date(0);
+                    const dateB = b.date ? new Date(b.date) : new Date(0);
+                    return dateB - dateA;
+                } catch (e) {
+                    console.error('日付ソートエラー:', e, a, b);
+                    return 0;
+                }
+            });
+
+            container.innerHTML = '';
+
+            sortedRecords.forEach(record => {
+                try {
+                    const item = createHistoryItem(record);
+                    container.appendChild(item);
+                } catch (e) {
+                    console.error('履歴アイテム作成エラー:', e, record);
+                }
+            });
+        }
+
+        /**
+         * 承認状況サマリーを表示
+         */
+        function displayApprovalStatusSummary(records) {
+            const summaryDiv = document.getElementById('approval-status-summary');
+            const contentDiv = document.getElementById('approval-status-content');
+
+            if (!summaryDiv || !contentDiv) return;
+
+            // 各ステータスの件数を集計
+            let approvedCount = 0;
+            let submittedCount = 0;
+            let rejectedCount = 0;
+            let workingCount = 0;
+
+            records.forEach(record => {
+                const status = record.status || '作業中';
+                if (status === '承認済' || status === 'APPROVED') {
+                    approvedCount++;
+                } else if (status === '提出済' || status === 'SUBMITTED') {
+                    submittedCount++;
+                } else if (status === '差戻し' || status === 'REJECTED') {
+                    rejectedCount++;
+                } else {
+                    workingCount++;
+                }
+            });
+
+            const totalCount = records.length;
+
+            // 月全体のステータスを判定
+            let overallStatus = '';
+            let overallStatusClass = '';
+            let overallStatusIcon = '';
+
+            if (rejectedCount > 0) {
+                overallStatus = '一部差戻し';
+                overallStatusClass = 'bg-red-100 text-red-800 border-red-300';
+                overallStatusIcon = 'fa-exclamation-circle';
+            } else if (approvedCount === totalCount) {
+                overallStatus = '全件承認済み';
+                overallStatusClass = 'bg-purple-100 text-purple-800 border-purple-300';
+                overallStatusIcon = 'fa-check-circle';
+            } else if (submittedCount > 0 || approvedCount > 0) {
+                overallStatus = '承認待ち';
+                overallStatusClass = 'bg-blue-100 text-blue-800 border-blue-300';
+                overallStatusIcon = 'fa-clock';
+            } else {
+                overallStatus = '未提出';
+                overallStatusClass = 'bg-gray-100 text-gray-800 border-gray-300';
+                overallStatusIcon = 'fa-file';
+            }
+
+            contentDiv.innerHTML = `
+                <div class="mb-3 text-center">
+                    <span class="inline-block px-4 py-2 rounded-lg border-2 ${overallStatusClass} font-bold text-lg">
+                        <i class="fas ${overallStatusIcon} mr-2"></i>${overallStatus}
+                    </span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div class="flex justify-between items-center p-2 bg-white rounded">
+                        <span class="text-gray-600">
+                            <i class="fas fa-check-circle text-purple-600 mr-1"></i>承認済み
+                        </span>
+                        <span class="font-bold text-purple-600">${approvedCount}件</span>
+                    </div>
+                    <div class="flex justify-between items-center p-2 bg-white rounded">
+                        <span class="text-gray-600">
+                            <i class="fas fa-paper-plane text-blue-600 mr-1"></i>提出済み
+                        </span>
+                        <span class="font-bold text-blue-600">${submittedCount}件</span>
+                    </div>
+                    <div class="flex justify-between items-center p-2 bg-white rounded">
+                        <span class="text-gray-600">
+                            <i class="fas fa-undo text-red-600 mr-1"></i>差戻し
+                        </span>
+                        <span class="font-bold text-red-600">${rejectedCount}件</span>
+                    </div>
+                    <div class="flex justify-between items-center p-2 bg-white rounded">
+                        <span class="text-gray-600">
+                            <i class="fas fa-edit text-gray-600 mr-1"></i>作業中
+                        </span>
+                        <span class="font-bold text-gray-600">${workingCount}件</span>
+                    </div>
+                </div>
+            `;
+
+            summaryDiv.style.display = 'block';
+        }
+
+        /**
+         * 履歴アイテムのHTML要素を生成
+         */
+        function createHistoryItem(record) {
+            const div = document.createElement('div');
+            div.className = 'history-item h-full cursor-pointer hover:bg-gray-50 transition-colors';
+            div.onclick = () => showHistoryDetail(record);
+
+            let dateStr = '日付不明';
+            try {
+                const date = record.date ? new Date(record.date) : new Date();
+                dateStr = formatDateJP(date);
+            } catch (e) {
+                console.error('日付フォーマットエラー:', e, record.date);
+            }
+
+            const destination = record.destination || '行先未記入';
+            const distance = record.distance || 0;
+            const status = record.status || '作業中';
+
+            // ステータスに応じたバッジのスタイル
+            let statusBadge = '';
+            if (status === '保存済' || status === 'SAVED') {
+                statusBadge = '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">保存済</span>';
+            } else if (status === '提出済' || status === 'SUBMITTED') {
+                statusBadge = '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">提出済</span>';
+            } else if (status === '承認済' || status === 'APPROVED') {
+                statusBadge = '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">承認済</span>';
+            } else if (status === '差戻し' || status === 'REJECTED') {
+                statusBadge = '<span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded"><i class="fas fa-exclamation-circle mr-1"></i>差戻し</span>';
+            } else {
+                statusBadge = '<span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">作業中</span>';
+            }
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-1">
+                    <div>
+                        <p class="font-bold text-gray-800">${dateStr}</p>
+                        <p class="text-sm text-gray-600">${destination}</p>
+                    </div>
+                    <span class="text-blue-600 font-bold">${distance}km</span>
+                </div>
+                <div class="flex justify-between items-center mt-2">
+                    ${statusBadge}
+                    <i class="fas fa-chevron-right text-gray-400"></i>
+                </div>
+            `;
+
+            return div;
+        }
+
+        /**
+         * 履歴の集計を計算
+         */
+        function calculateHistorySummary(records) {
+            let workDays = 0;
+            let totalDistance = 0;
+
+            records.forEach(record => {
+                if (record.distance > 0) {
+                    workDays++;
+                    totalDistance += parseFloat(record.distance) || 0;
+                }
+            });
+
+            const workDaysElem = document.getElementById('history-work-days');
+            const totalDistanceElem = document.getElementById('history-total-distance');
+
+            if (workDaysElem) workDaysElem.textContent = workDays + '日';
+            if (totalDistanceElem) totalDistanceElem.textContent = totalDistance.toLocaleString() + 'km';
+        }
+
+        /**
+         * 日付を日本語形式でフォーマット（例：4月15日（月））
+         */
+        function formatDateJP(date) {
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            const weekday = weekdays[date.getDay()];
+            return `${month}月${day}日（${weekday}）`;
+        }
+
+        /**
+         * 年月度の表示形式を生成（例：2025年4月度（3/21〜4/20））
+         */
+        function formatYearMonthDisplay(yearMonth, period) {
+            const [year, month] = yearMonth.split('-').map(Number);
+            const startDate = new Date(period.start);
+            const endDate = new Date(period.end);
+            return `${year}年${month}月度（${startDate.getMonth() + 1}/${startDate.getDate()}〜${endDate.getMonth() + 1}/${endDate.getDate()}）`;
+        }
+
+        /**
+         * 履歴詳細モーダルを表示
+         */
+        function showHistoryDetail(record) {
+            const modal = document.getElementById('history-detail-modal');
+            const content = document.getElementById('history-detail-content');
+
+            // 日付フォーマット
+            let dateStr = '日付不明';
+            try {
+                const date = record.date ? new Date(record.date) : new Date();
+                dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+            } catch (e) {
+                console.error('日付フォーマットエラー:', e);
+            }
+
+            // ステータス表示
+            let statusBadge = '';
+            const status = record.status || '作業中';
+            if (status === '保存済' || status === 'SAVED') {
+                statusBadge = '<span class="text-sm bg-green-100 text-green-800 px-3 py-1 rounded">保存済</span>';
+            } else if (status === '提出済' || status === 'SUBMITTED') {
+                statusBadge = '<span class="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded">提出済</span>';
+            } else if (status === '承認済' || status === 'APPROVED') {
+                statusBadge = '<span class="text-sm bg-purple-100 text-purple-800 px-3 py-1 rounded">承認済</span>';
+            } else if (status === '差戻し' || status === 'REJECTED') {
+                statusBadge = '<span class="text-sm bg-red-100 text-red-800 px-3 py-1 rounded">差戻し</span>';
+            } else {
+                statusBadge = '<span class="text-sm bg-gray-100 text-gray-600 px-3 py-1 rounded">作業中</span>';
+            }
+
+            content.innerHTML = `
+                <div class="card bg-blue-50 border-2 border-blue-200">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-lg">${dateStr}</h4>
+                        ${statusBadge}
+                    </div>
+                    <p class="text-sm text-gray-600">運転者: ${record.userName || '不明'}</p>
+                    <p class="text-sm text-gray-600">車番: ${record.carNumber || '未設定'}</p>
+                </div>
+
+                <div class="card">
+                    <h4 class="font-bold mb-3 text-blue-800"><i class="fas fa-tachometer-alt mr-2"></i>メーター・走行距離</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">出発メーター:</span>
+                            <span class="font-semibold">${record.departureMeter ? record.departureMeter.toLocaleString() + ' km' : '未記入'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">帰着メーター:</span>
+                            <span class="font-semibold">${record.arrivalMeter ? record.arrivalMeter.toLocaleString() + ' km' : '未記入'}</span>
+                        </div>
+                        <div class="flex justify-between border-t-2 border-blue-200 pt-2 mt-2">
+                            <span class="text-gray-800 font-bold">走行距離:</span>
+                            <span class="font-bold text-blue-600 text-xl">${record.distance ? record.distance.toLocaleString() + ' km' : '0 km'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h4 class="font-bold mb-3 text-blue-800"><i class="fas fa-map-marker-alt mr-2"></i>行先</h4>
+                    <div class="flex justify-between">
+                        <span class="font-semibold text-lg">${record.destination || '未記入'}</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h4 class="font-bold mb-3 text-green-800"><i class="fas fa-clipboard-check mr-2"></i>出発時点検</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">アルコール点検（始）:</span>
+                            <span class="font-semibold ${(record.alcoholStart === '済' || record.alcoholStart === '実施') ? 'text-green-600' : 'text-red-600'}">${record.alcoholStart || '未実施'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">日常点検:</span>
+                            <span class="font-semibold ${(record.dailyCheck === '異常なし' || record.dailyCheck === '正常') ? 'text-green-600' : record.dailyCheck === '異常あり' ? 'text-orange-600' : 'text-gray-600'}">${record.dailyCheck || '未実施'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h4 class="font-bold mb-3 text-orange-800"><i class="fas fa-clipboard-check mr-2"></i>帰着時点検</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">車内清掃:</span>
+                            <span class="font-semibold ${(record.carCleaning === '済' || record.carCleaning === '実施済') ? 'text-green-600' : 'text-red-600'}">${record.carCleaning || '未実施'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card ${record.troubleStatus === 'あり' ? 'bg-red-50 border-2 border-red-200' : ''}">
+                    <h4 class="font-bold mb-3 ${record.troubleStatus === 'あり' ? 'text-red-800' : 'text-gray-800'}"><i class="fas fa-exclamation-triangle mr-2"></i>不具合</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">不具合有無:</span>
+                            <span class="font-semibold ${record.troubleStatus === 'あり' ? 'text-red-600' : 'text-green-600'}">${record.troubleStatus || 'なし'}</span>
+                        </div>
+                        ${record.troubleStatus === 'あり' && record.troubleDetail ? `
+                        <div class="border-t pt-2 mt-2">
+                            <p class="text-sm text-gray-600 mb-1">不具合詳細:</p>
+                            <p class="text-gray-800 font-semibold whitespace-pre-wrap">${record.troubleDetail}</p>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                ${record.remarks ? `
+                <div class="card bg-yellow-50 border-2 border-yellow-200">
+                    <h4 class="font-bold mb-2 text-yellow-900"><i class="fas fa-comment mr-2"></i>備考</h4>
+                    <p class="text-gray-800 whitespace-pre-wrap">${record.remarks}</p>
+                </div>
+                ` : ''}
+
+                ${record.rejectComment ? `
+                <div class="card bg-red-50 border-2 border-red-300">
+                    <h4 class="font-bold mb-2 text-red-900">
+                        <i class="fas fa-comment-dots mr-2"></i>差戻しコメント（管理者）
+                    </h4>
+                    <p class="text-gray-800 whitespace-pre-wrap">${record.rejectComment}</p>
+                </div>
+                ` : ''}
+
+                ${(status === '作業中' || status === '保存済' || status === '差戻し') ? `
+                <div class="card">
+                    ${status === '差戻し' ? `
+                    <p class="text-sm text-yellow-900 mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded">
+                        <i class="fas fa-info-circle mr-2"></i>差戻しコメントを確認の上、修正してください
+                    </p>
+                    ` : ''}
+                    <button onclick="editRecord('${record.id}', '${record.date}')" class="btn w-full bg-blue-600 text-white hover:bg-blue-700">
+                        <i class="fas fa-edit mr-2"></i>このレコードを編集する
+                    </button>
+                </div>
+                ` : ''}
+
+                ${(status === '提出済' || status === '承認済') ? `
+                <div class="card bg-gray-50">
+                    <p class="text-sm text-gray-600 text-center">
+                        <i class="fas fa-lock mr-2"></i>このレコードは${status}のため編集できません
+                    </p>
+                </div>
+                ` : ''}
+            `;
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        /**
+         * 履歴詳細モーダルを閉じる
+         */
+        function hideHistoryDetail() {
+            const modal = document.getElementById('history-detail-modal');
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        /**
+         * 履歴レコードの編集（作業中・保存済・差戻し対象）
+         */
+        function editRecord(recordId, recordDate) {
+            hideHistoryDetail();
+            showScreen('arrival');
+
+            const dateInput = document.getElementById('arrival-date');
+            if (dateInput) {
+                dateInput.value = recordDate;
+
+                // 日付変更イベントをトリガーして出発記録を読み込む
+                const carSelect = document.getElementById('arrival-car');
+                if (carSelect.value) {
+                    loadArrivalDepartureMeter(recordDate, carSelect.value);
+                }
+            }
+        }
+
+        /**
+         * 差戻されたレコードを編集する（後方互換性のためのエイリアス）
+         * @deprecated editRecord()を使用してください
+         */
+        function editRejectedRecord(recordId, recordDate) {
+            editRecord(recordId, recordDate);
+        }
+
+        /**
+         * JavaScriptで年月度を計算（20日締め）
+         */
+        function calculateYearMonthJS(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+
+            if (day <= 20) {
+                return year + '-' + String(month).padStart(2, '0');
+            } else {
+                const nextMonth = month === 12 ? 1 : month + 1;
+                const nextYear = month === 12 ? year + 1 : year;
+                return nextYear + '-' + String(nextMonth).padStart(2, '0');
+            }
+        }
+
+        /**
+         * JavaScriptで月度期間を取得
+         */
+        function getMonthPeriodJS(yearMonth) {
+            const [year, month] = yearMonth.split('-').map(Number);
+
+            const prevMonth = month === 1 ? 12 : month - 1;
+            const prevYear = month === 1 ? year - 1 : year;
+
+            const startDate = new Date(prevYear, prevMonth - 1, 21);
+            const endDate = new Date(year, month - 1, 20);
+
+            return {
+                start: startDate.toISOString().split('T')[0],
+                end: endDate.toISOString().split('T')[0]
+            };
+        }
+
+        // ===========================================
+        // 月次提出画面
+        // ===========================================
+
+        function loadSubmitData() {
+            if (!currentUser) return;
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        document.querySelector('#screen-submit .grid > div:nth-child(1) p.text-2xl').textContent = result.workDays + '日';
+                        document.querySelector('#screen-submit .grid > div:nth-child(2) p.text-2xl').textContent = result.totalDistance + 'km';
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('月次データ取得エラー:', error);
+                })
+                .getMonthlyDistance(currentUser.userId, currentYearMonth);
+        }
+
+        // ===========================================
+        // 月次提出画面
+        // ===========================================
+
+        /**
+         * 月次提出画面の初期化
+         */
+        function initSubmitScreen() {
+            if (!currentUser) return;
+
+            // 年月選択欄を生成（過去6ヶ月分）
+            const select = document.getElementById('submit-year-month');
+            select.innerHTML = '';
+
+            // 今日の日付から年月度を計算
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    const currentYM = result.yearMonth;
+
+                    // 過去6ヶ月分の年月度を生成
+                    const yearMonths = generatePastMonths(currentYM, 6);
+
+                    yearMonths.forEach(ym => {
+                        const option = document.createElement('option');
+                        option.value = ym;
+                        const [year, month] = ym.split('-');
+                        option.textContent = `${year}年${parseInt(month)}月度`;
+                        select.appendChild(option);
+                    });
+
+                    // 現在の年月度を初期選択
+                    select.value = currentYM;
+
+                    // データを読み込み
+                    loadSubmitData();
+                })
+                .withFailureHandler(function(error) {
+                    console.error('年月度取得エラー:', error);
+                })
+                .testGetCurrentYearMonth();
+        }
+
+        /**
+         * 過去N ヶ月分の年月度リストを生成
+         */
+        function generatePastMonths(currentYM, count) {
+            const result = [];
+            let [year, month] = currentYM.split('-').map(Number);
+
+            for (let i = 0; i < count; i++) {
+                result.push(`${year}-${String(month).padStart(2, '0')}`);
+
+                // 1ヶ月前に移動
+                month--;
+                if (month < 1) {
+                    month = 12;
+                    year--;
+                }
+            }
+
+            return result;
+        }
+
+        /**
+         * 選択された年月度のデータを読み込み
+         */
+        function loadSubmitData() {
+            if (!currentUser) return;
+
+            const selectedYearMonth = document.getElementById('submit-year-month').value;
+            if (!selectedYearMonth) return;
+
+            showLoading();
+
+            // 年月度の期間を取得
+            google.script.run
+                .withSuccessHandler(function(periodResult) {
+                    const period = periodResult.period;
+                    const [year, month] = selectedYearMonth.split('-');
+
+                    // タイトルと期間を表示
+                    document.getElementById('submit-title').textContent = `${year}年${parseInt(month)}月度の提出`;
+
+                    const startDate = period.start.split('-').slice(1).join('/');
+                    const endDate = period.end.split('-').slice(1).join('/');
+                    document.getElementById('submit-period').textContent = `対象期間：${startDate}〜${endDate}`;
+
+                    // 月間走行距離を取得
+                    google.script.run
+                        .withSuccessHandler(function(result) {
+                            hideLoading();
+                            if (result.success) {
+                                // 統計情報を表示
+                                document.getElementById('submit-work-days').textContent = result.workDays + '日';
+                                document.getElementById('submit-total-distance').textContent = result.totalDistance.toLocaleString() + 'km';
+                                document.getElementById('submit-record-count').textContent = result.recordCount + '件';
+
+                                // 警告メッセージ（必要に応じて）
+                                const warningArea = document.getElementById('submit-warning-area');
+                                if (result.recordCount === 0) {
+                                    warningArea.innerHTML = `
+                                        <div class="alert-box alert-error">
+                                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                                            この月の記録がありません。
+                                        </div>
+                                    `;
+                                } else {
+                                    warningArea.innerHTML = '';
+                                }
+                            }
+                        })
+                        .withFailureHandler(function(error) {
+                            hideLoading();
+                            showError('データの取得に失敗しました');
+                        })
+                        .getMonthlyDistance(currentUser.userId, selectedYearMonth);
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    console.error('期間取得エラー:', error);
+                })
+                .testGetCurrentYearMonth();
+        }
+
+        function submitMonthly() {
+            const selectedYearMonth = document.getElementById('submit-year-month').value;
+            if (!selectedYearMonth) {
+                showError('年月度を選択してください');
+                return;
+            }
+
+            const checkbox = document.querySelector('#screen-submit input[type="checkbox"]');
+            if (!checkbox.checked) {
+                showError('確認チェックボックスをONにしてください');
+                return;
+            }
+
+            const [year, month] = selectedYearMonth.split('-');
+            const confirmMessage = `${year}年${parseInt(month)}月度の日報を提出します。提出後は編集できなくなりますがよろしいですか？`;
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        // キャッシュをクリア
+                        clearCache('history');
+                        showSuccess(result.message);
+                        // 即座に画面遷移
+                        showScreen('home');
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('月次提出に失敗しました: ' + error.message);
+                })
+                .submitMonthly(currentUser.userId, selectedYearMonth);
+        }
+
+        // ===========================================
+        // 管理者画面
+        // ===========================================
+
+        function loadAdminData() {
+            if (!currentUser || currentUser.role !== '管理者') {
+                showError('管理者権限がありません');
+                showScreen('home');
+                return;
+            }
+
+            console.log('管理者画面データ読み込み開始');
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('管理者画面データ取得結果:', result);
+                    console.log('result type:', typeof result);
+                    console.log('result is null?', result === null);
+                    console.log('result is undefined?', result === undefined);
+
+                    if (!result) {
+                        console.error('管理者データ取得失敗: resultがnullまたはundefined');
+                        const container = document.getElementById('admin-list-container');
+                        if (container) {
+                            container.innerHTML = '<div class="card text-center text-red-500">データの取得に失敗しました。Google Apps Scriptのログを確認してください。</div>';
+                        }
+                        showError('データの取得に失敗しました。管理者に連絡してください。');
+                        return;
+                    }
+
+                    if (result.success) {
+                        console.log('リスト件数:', result.list ? result.list.length : 0);
+                        if (result.list && result.list.length > 0) {
+                            console.log('最初のアイテム:', result.list[0]);
+                        }
+                        displayAdminList(result.list || []);
+                    } else {
+                        console.error('管理者データ取得失敗:', result.message);
+                        const container = document.getElementById('admin-list-container');
+                        if (container) {
+                            container.innerHTML = '<div class="card text-center text-red-500">' + (result.message || 'データの取得に失敗しました') + '</div>';
+                        }
+                        showError(result.message || 'データの取得に失敗しました');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('未承認一覧取得エラー:', error);
+                    console.error('error type:', typeof error);
+                    console.error('error.message:', error ? error.message : 'なし');
+                    console.error('error.stack:', error ? error.stack : 'なし');
+                    const container = document.getElementById('admin-list-container');
+                    if (container) {
+                        const errorMsg = error && error.message ? error.message : 'エラーが発生しました';
+                        container.innerHTML = '<div class="card text-center text-red-500">エラー: ' + errorMsg + '<br><small>Google Apps Scriptのログを確認してください。</small></div>';
+                    }
+                    showError('エラーが発生しました: ' + (error && error.message ? error.message : '不明なエラー'));
+                })
+                .getAdminPendingList();
+        }
+
+        function displayAdminList(list) {
+            const container = document.getElementById('admin-list-container');
+            if (!container) {
+                console.error('admin-list-container要素が見つかりません');
+                return;
+            }
+
+            container.innerHTML = '';
+
+            if (!list || list.length === 0) {
+                container.innerHTML = '<div class="card text-center text-gray-500">未承認の提出はありません</div>';
+                return;
+            }
+
+            list.forEach(item => {
+                try {
+                    // プロパティの安全な取得
+                    const userId = item.userId || '';
+                    const userName = item.userName || '不明';
+                    const yearMonth = item.yearMonth || '';
+                    const status = item.status || '提出済';
+                    const workDays = item.workDays || 0;
+                    const totalDistance = item.totalDistance || 0;
+                    const hasTrouble = item.hasDefect || item.hasTrouble || false;
+                    const approverName = item.approverName || '不明';
+                    const approvedDate = item.approvedDate || '';
+
+                    const card = document.createElement('div');
+
+                    // ステータスに応じた色分け
+                    let borderColor = 'border-blue-500';
+                    let bgColor = 'bg-blue-50';
+                    let statusClass = 'bg-blue-100 text-blue-600';
+                    let statusText = '提出済';
+
+                    if (status === '承認済' || status === 'APPROVED') {
+                        borderColor = 'border-gray-300';
+                        bgColor = 'bg-gray-50';
+                        statusClass = 'bg-purple-100 text-purple-600';
+                        statusText = '承認済';
+                    } else if (status === '差戻し' || status === 'REJECTED') {
+                        borderColor = 'border-red-500';
+                        bgColor = 'bg-red-50';
+                        statusClass = 'bg-red-100 text-red-600';
+                        statusText = '差戻し';
+                    }
+
+                    card.className = `border-l-4 ${borderColor} ${bgColor} p-4 rounded-lg h-full flex flex-col`;
+
+                    let warningHtml = '';
+                    if (hasTrouble) {
+                        borderColor = 'border-red-500';
+                        bgColor = 'bg-red-50';
+                        card.className = `border-l-4 ${borderColor} ${bgColor} p-4 rounded-lg h-full flex flex-col`;
+                        warningHtml = `
+                            <div class="alert-box alert-error mb-3">
+                                <i class="fas fa-exclamation-circle mr-2"></i>
+                                不具合報告が含まれています
+                            </div>
+                        `;
+                    }
+
+                    let buttonsHtml = '';
+                    if (status !== '承認済') {
+                        buttonsHtml = `
+                            <div class="flex gap-2">
+                                <button onclick="approveRecord('${userId}', '${yearMonth}')" class="btn flex-1 bg-green-600 text-white hover:bg-green-700 text-sm">
+                                    <i class="fas fa-check mr-2"></i>承認
+                                </button>
+                                <button onclick="rejectRecord('${userId}', '${yearMonth}')" class="btn flex-1 bg-red-600 text-white hover:bg-red-700 text-sm">
+                                    <i class="fas fa-undo mr-2"></i>差戻し
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        buttonsHtml = `<p class="text-xs text-gray-500">承認者：${approverName}（${approvedDate}）</p>`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <p class="font-bold text-gray-800">${userName}</p>
+                                <p class="text-sm text-gray-600">${yearMonth}</p>
+                            </div>
+                            <span class="text-xs ${statusClass} px-2 py-1 rounded">${statusText}</span>
+                        </div>
+                        ${warningHtml}
+                        <div class="grid grid-cols-2 gap-3 text-xs sm:text-sm mb-3">
+                            <div>稼働日数：<span class="font-bold">${workDays}日</span></div>
+                            <div>走行距離：<span class="font-bold">${totalDistance.toLocaleString()}km</span></div>
+                        </div>
+                        ${buttonsHtml}
+                    `;
+
+                    container.appendChild(card);
+                } catch (e) {
+                    console.error('管理者リストアイテム作成エラー:', e, item);
+                }
+            });
+        }
+
+        function approveRecord(userId, yearMonth) {
+            if (!confirm('この月次日報を承認しますか？')) {
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess(result.message);
+                        loadAdminData();
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('承認処理に失敗しました: ' + error.message);
+                })
+                .approveMonthly(userId, yearMonth, currentUser.name);
+        }
+
+        let pendingRejectUserId = null;
+        let pendingRejectYearMonth = null;
+
+        function rejectRecord(userId, yearMonth) {
+            pendingRejectUserId = userId;
+            pendingRejectYearMonth = yearMonth;
+            showRejectCommentModal();
+        }
+
+        function showRejectCommentModal() {
+            const modal = document.getElementById('reject-comment-modal');
+            const textarea = document.getElementById('reject-comment-text');
+            if (modal && textarea) {
+                textarea.value = '';
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function hideRejectCommentModal() {
+            const modal = document.getElementById('reject-comment-modal');
+            if (modal) {
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+            pendingRejectUserId = null;
+            pendingRejectYearMonth = null;
+        }
+
+        function confirmReject() {
+            const comment = document.getElementById('reject-comment-text').value.trim();
+
+            if (!comment) {
+                showError('差戻しコメントを入力してください');
+                return;
+            }
+
+            hideRejectCommentModal();
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        showSuccess(result.message);
+                        loadAdminData();
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('差戻し処理に失敗しました: ' + error.message);
+                })
+                .rejectMonthly(pendingRejectUserId, pendingRejectYearMonth, comment);
+        }
+
+        // ===========================================
+        // 従業員マスタ管理
+        // ===========================================
+
+        function loadEmployeeMasterData() {
+            // 管理者権限チェック
+            if (!currentUser || currentUser.role !== '管理者') {
+                showError('管理者権限がありません');
+                showScreen('home');
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        displayEmployeeList(result.employees);
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('従業員一覧の取得に失敗しました: ' + error.message);
+                })
+                .getEmployeeListForAdmin();
+
+            // 車両一覧も取得してセレクトボックスに設定
+            loadCarListForSelect();
+        }
+
+        function loadCarListForSelect() {
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        const select = document.getElementById('employee-car');
+                        select.innerHTML = '<option value="">未割り当て</option>';
+                        result.cars.forEach(car => {
+                            const option = document.createElement('option');
+                            option.value = car.carNumber;
+                            option.textContent = car.carNumber + '（' + car.carType + '）';
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error('車両一覧取得エラー:', error);
+                })
+                .getCarList();
+        }
+
+        function displayEmployeeList(employees) {
+            const container = document.getElementById('employee-list-container');
+            container.innerHTML = '';
+
+            if (employees.length === 0) {
+                container.innerHTML = '<div class="card text-center text-gray-500">従業員が登録されていません</div>';
+                return;
+            }
+
+            employees.forEach(emp => {
+                const card = document.createElement('div');
+                card.className = 'card h-full flex flex-col';
+
+                const statusClass = emp.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600';
+                const statusText = emp.isActive ? '有効' : '無効';
+                const roleText = emp.role === '管理者' ? '管理者' : '使用者';
+                const roleClass = emp.role === '管理者' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
+
+                card.innerHTML = `
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
+                        <div>
+                            <p class="font-bold text-base sm:text-lg text-gray-800">${emp.name}</p>
+                            <p class="text-sm text-gray-600">ID: ${emp.userId}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <span class="text-xs ${statusClass} px-2 py-1 rounded whitespace-nowrap">${statusText}</span>
+                            <span class="text-xs ${roleClass} px-2 py-1 rounded whitespace-nowrap">${roleText}</span>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-3">
+                        <div class="flex items-center">
+                            <i class="fas fa-car w-5 mr-2"></i>
+                            <span>担当車両: ${emp.carNumber || '未割り当て'}</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="editEmployee('${emp.userId}')" class="btn flex-1 bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                            <i class="fas fa-edit mr-2"></i>編集
+                        </button>
+                        <button onclick="deleteEmployeeConfirm('${emp.userId}', '${emp.name}')" class="btn flex-1 bg-red-600 text-white hover:bg-red-700 text-sm">
+                            <i class="fas fa-trash mr-2"></i>削除
+                        </button>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        function showEmployeeForm(mode) {
+            employeeFormMode = mode;
+            const modal = document.getElementById('employee-form-modal');
+            modal.classList.add('active');
+            document.getElementById('employee-form-title').textContent = mode === 'add' ? '新規従業員登録' : '従業員編集';
+
+            if (mode === 'add') {
+                // フォームをクリア
+                document.getElementById('employee-userId').value = '';
+                document.getElementById('employee-userId').readOnly = false;
+                document.getElementById('employee-name').value = '';
+                document.getElementById('employee-car').value = '';
+                document.getElementById('employee-role').value = '';
+                employeeActiveFlag = true;
+                setEmployeeActive(true);
+            }
+
+            // body要素のスクロールを防止
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideEmployeeForm() {
+            const modal = document.getElementById('employee-form-modal');
+            modal.classList.remove('active');
+            selectedEmployee = null;
+            // body要素のスクロールを復元
+            document.body.style.overflow = '';
+        }
+
+        function editEmployee(userId) {
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        const emp = result.employees.find(e => e.userId === userId);
+                        if (emp) {
+                            selectedEmployee = emp;
+                            showEmployeeForm('edit');
+
+                            document.getElementById('employee-userId').value = emp.userId;
+                            document.getElementById('employee-userId').readOnly = true;
+                            document.getElementById('employee-name').value = emp.name;
+                            document.getElementById('employee-car').value = emp.carNumber || '';
+                            document.getElementById('employee-role').value = emp.role || '';
+                            employeeActiveFlag = emp.isActive;
+                            setEmployeeActive(emp.isActive);
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('従業員情報の取得に失敗しました');
+                })
+                .getEmployeeListForAdmin();
+        }
+
+        function setEmployeeActive(isActive) {
+            employeeActiveFlag = isActive;
+            const activeBtn = document.getElementById('employee-active-btn');
+            const inactiveBtn = document.getElementById('employee-inactive-btn');
+
+            if (isActive) {
+                activeBtn.classList.add('active');
+                inactiveBtn.classList.remove('active');
+            } else {
+                activeBtn.classList.remove('active');
+                inactiveBtn.classList.add('active');
+            }
+        }
+
+        function saveEmployee() {
+            const employeeData = {
+                userId: document.getElementById('employee-userId').value.trim(),
+                name: document.getElementById('employee-name').value.trim(),
+                carNumber: document.getElementById('employee-car').value,
+                role: document.getElementById('employee-role').value,
+                isActive: employeeActiveFlag
+            };
+
+            // クライアント側バリデーション
+            if (!employeeData.userId) {
+                showError('ユーザーIDを入力してください');
+                return;
+            }
+
+            if (!employeeData.name) {
+                showError('氏名を入力してください');
+                return;
+            }
+
+            showLoading();
+
+            const functionName = employeeFormMode === 'add' ? 'addEmployee' : 'updateEmployee';
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        // キャッシュをクリア
+                        clearCache('employees');
+                        clearCache('cars');
+                        showSuccess(result.message);
+                        hideEmployeeForm();
+                        // データを再読み込み
+                        loadEmployeeMasterData();
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('保存に失敗しました: ' + error.message);
+                })
+                [functionName](employeeData);
+        }
+
+        function deleteEmployeeConfirm(userId, userName) {
+            if (!confirm('「' + userName + '」を削除しますか？\n\n※過去の運転日報データが存在する場合は無効化されます。')) {
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        // キャッシュをクリア
+                        clearCache('employees');
+                        showSuccess(result.message);
+                        loadEmployeeMasterData();
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('削除に失敗しました: ' + error.message);
+                })
+                .deleteEmployee(userId);
+        }
+
+        // ===========================================
+        // 車両マスタ管理
+        // ===========================================
+
+        function loadVehicleMasterData() {
+            // 管理者権限チェック
+            if (!currentUser || currentUser.role !== '管理者') {
+                showError('管理者権限がありません');
+                showScreen('home');
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        displayVehicleList(result.vehicles);
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('車両一覧の取得に失敗しました: ' + error.message);
+                })
+                .getVehicleListForAdmin();
+        }
+
+        function displayVehicleList(vehicles) {
+            const container = document.getElementById('vehicle-list-container');
+            container.innerHTML = '';
+
+            if (vehicles.length === 0) {
+                container.innerHTML = '<div class="card text-center text-gray-500">車両が登録されていません</div>';
+                return;
+            }
+
+            vehicles.forEach(vehicle => {
+                const card = document.createElement('div');
+                card.className = 'card h-full flex flex-col';
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <p class="font-bold text-lg text-gray-800">${vehicle.carNumber}</p>
+                            <p class="text-sm text-gray-600">${vehicle.carType}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500">最終メーター</p>
+                            <p class="text-lg font-bold text-blue-600">${vehicle.lastMeter.toLocaleString()} km</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="editVehicle('${vehicle.carNumber}')" class="btn flex-1 bg-yellow-500 text-white hover:bg-yellow-600 text-sm">
+                            <i class="fas fa-edit mr-2"></i>編集
+                        </button>
+                        <button onclick="deleteVehicleConfirm('${vehicle.carNumber}')" class="btn flex-1 bg-red-600 text-white hover:bg-red-700 text-sm">
+                            <i class="fas fa-trash mr-2"></i>削除
+                        </button>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        function showVehicleForm(mode) {
+            vehicleFormMode = mode;
+            const modal = document.getElementById('vehicle-form-modal');
+            modal.classList.add('active');
+            document.getElementById('vehicle-form-title').textContent = mode === 'add' ? '新規車両登録' : '車両編集';
+
+            if (mode === 'add') {
+                // フォームをクリア
+                document.getElementById('vehicle-carNumber').value = '';
+                document.getElementById('vehicle-carNumber').readOnly = false;
+                document.getElementById('vehicle-carType').value = '';
+                document.getElementById('vehicle-lastMeter').value = '0';
+            }
+
+            // body要素のスクロールを防止
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideVehicleForm() {
+            const modal = document.getElementById('vehicle-form-modal');
+            modal.classList.remove('active');
+            selectedVehicle = null;
+            // body要素のスクロールを復元
+            document.body.style.overflow = '';
+        }
+
+        function editVehicle(carNumber) {
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        const vehicle = result.vehicles.find(v => v.carNumber === carNumber);
+                        if (vehicle) {
+                            selectedVehicle = vehicle;
+                            showVehicleForm('edit');
+
+                            document.getElementById('vehicle-carNumber').value = vehicle.carNumber;
+                            document.getElementById('vehicle-carNumber').readOnly = true;
+                            document.getElementById('vehicle-carType').value = vehicle.carType;
+                            document.getElementById('vehicle-lastMeter').value = vehicle.lastMeter;
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('車両情報の取得に失敗しました');
+                })
+                .getVehicleListForAdmin();
+        }
+
+        function saveVehicle() {
+            const vehicleData = {
+                carNumber: document.getElementById('vehicle-carNumber').value.trim(),
+                carType: document.getElementById('vehicle-carType').value.trim(),
+                lastMeter: parseFloat(document.getElementById('vehicle-lastMeter').value) || 0
+            };
+
+            // クライアント側バリデーション
+            if (!vehicleData.carNumber) {
+                showError('車番を入力してください');
+                return;
+            }
+
+            if (!vehicleData.carType) {
+                showError('車種を入力してください');
+                return;
+            }
+
+            if (vehicleData.lastMeter < 0) {
+                showError('最終メーターは0以上の数値を入力してください');
+                return;
+            }
+
+            showLoading();
+
+            const functionName = vehicleFormMode === 'add' ? 'addVehicle' : 'updateVehicle';
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        // キャッシュをクリア
+                        clearCache('vehicles');
+                        clearCache('cars');
+                        showSuccess(result.message);
+                        hideVehicleForm();
+                        // データを再読み込み
+                        loadVehicleMasterData();
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('保存に失敗しました: ' + error.message);
+                })
+                [functionName](vehicleData);
+        }
+
+        function deleteVehicleConfirm(carNumber) {
+            if (!confirm('車両「' + carNumber + '」を削除しますか？\n\n※運転日報データで使用されている場合や従業員に割り当てられている場合は削除できません。')) {
+                return;
+            }
+
+            showLoading();
+
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    hideLoading();
+                    if (result.success) {
+                        // キャッシュをクリア
+                        clearCache('vehicles');
+                        clearCache('cars');
+                        showSuccess(result.message);
+                        loadVehicleMasterData();
+                    } else {
+                        showError(result.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showError('削除に失敗しました: ' + error.message);
+                })
+                .deleteVehicle(carNumber);
+        }
+
+        // ===========================================
+        // 初期化処理
+        // ===========================================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // トグルボタンの動作
+            const toggleGroups = document.querySelectorAll('.toggle-btn');
+            toggleGroups.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const parent = this.parentElement;
+                    parent.querySelectorAll('.toggle-btn').forEach(b => {
+                        b.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                });
+            });
+
+            // ボタンにイベントリスナーを設定
+            const loginBtn = document.querySelector('#screen-login button');
+            if (loginBtn) {
+                loginBtn.onclick = doLogin;
+            }
+
+            const departureBtn = document.querySelector('#screen-departure .card:last-child button');
+            if (departureBtn) {
+                departureBtn.onclick = saveDeparture;
+            }
+
+            const arrivalBtn = document.querySelector('#screen-arrival .card:last-child button');
+            if (arrivalBtn) {
+                arrivalBtn.onclick = saveArrival;
+            }
+
+            // 月次提出ボタンは、HTML側でonclick="submitMonthly()"が設定されているため、
+            // ここでは設定不要（誤って戻るボタンに設定されるのを防ぐ）
+            // const submitBtn = document.querySelector('#screen-submit button');
+            // if (submitBtn) {
+            //     submitBtn.onclick = submitMonthly;
+            // }
+
+            // 常にログイン画面から開始
+            currentUser = null;
+            showScreen('login');
+            loadUserList();
+        });
+    </script>
+</body>
+</html>
