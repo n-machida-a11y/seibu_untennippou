@@ -1,0 +1,1367 @@
+// ===========================================
+// かんたん運転日報システム V2.0
+// Google Apps Script バックエンドコード
+// ===========================================
+
+// スプレッドシートID（デプロイ時に必ず変更すること）
+const SPREADSHEET_ID = '1m-gg-S_WESgZffPBxabUyVLZrr1EqGgZRmVysiDhHF8';
+
+// シート名定義
+const SHEET_NAMES = {
+  LOG_DATA: '記録蓄積用',
+  MASTER_USER: '利用者一覧',
+  MASTER_CAR: '社用車一覧'
+};
+
+// ステータス定義
+const STATUS = {
+  WORKING: '作業中',
+  SAVED: '保存済',
+  SUBMITTED: '提出済',
+  APPROVED: '承認済',
+  REJECTED: '差戻し'
+};
+
+// ===========================================
+// メイン関数：HTMLページの配信
+// ===========================================
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('かんたん運転日報システム V2')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ===========================================
+// ユーティリティ関数
+// ===========================================
+
+/**
+ * スプレッドシートオブジェクトを取得
+ */
+function getSpreadsheet() {
+  try {
+    Logger.log('スプレッドシートを開きます: ' + SPREADSHEET_ID);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    if (!ss) {
+      throw new Error('スプレッドシートが見つかりません');
+    }
+    Logger.log('スプレッドシート取得成功: ' + ss.getName());
+    return ss;
+  } catch (e) {
+    Logger.log('スプレッドシート取得エラー: ' + e.message);
+    Logger.log('スタックトレース: ' + e.stack);
+    throw new Error('スプレッドシートの取得に失敗しました: ' + e.message);
+  }
+}
+
+/**
+ * 指定されたシートを取得
+ */
+function getSheet(sheetName) {
+  try {
+    Logger.log('シートを取得します: ' + sheetName);
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      Logger.log('シートが見つかりません: ' + sheetName);
+      Logger.log('利用可能なシート: ' + ss.getSheets().map(s => s.getName()).join(', '));
+      return null;
+    }
+    Logger.log('シート取得成功: ' + sheetName);
+    return sheet;
+  } catch (e) {
+    Logger.log('シート取得エラー: ' + e.message);
+    Logger.log('スタックトレース: ' + e.stack);
+    throw e;
+  }
+}
+
+/**
+ * UUIDを生成
+ */
+function generateUUID() {
+  return Utilities.getUuid();
+}
+
+/**
+ * 日付から年月度を計算（20日締め）
+ * 例: 2025-03-25 → "2025-04", 2025-04-15 → "2025-04", 2025-04-21 → "2025-05"
+ */
+function calculateYearMonth(date) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1; // 0-11 → 1-12
+  const day = d.getDate();
+
+  if (day <= 20) {
+    // 20日以前は当月
+    return year + '-' + String(month).padStart(2, '0');
+  } else {
+    // 21日以降は翌月
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    return nextYear + '-' + String(nextMonth).padStart(2, '0');
+  }
+}
+
+/**
+ * 年月度から期間の開始日・終了日を取得
+ * 例: "2025-04" → { start: "2025-03-21", end: "2025-04-20" }
+ */
+function getMonthPeriod(yearMonth) {
+  const [year, month] = yearMonth.split('-').map(Number);
+
+  // 前月の21日
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  const startDate = new Date(prevYear, prevMonth - 1, 21);
+
+  // 当月の20日
+  const endDate = new Date(year, month - 1, 20);
+
+  return {
+    start: Utilities.formatDate(startDate, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+    end: Utilities.formatDate(endDate, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+  };
+}
+
+/**
+ * 現在の年月度を取得
+ */
+function getCurrentYearMonth() {
+  return calculateYearMonth(new Date());
+}
+
+// ===========================================
+// 認証・ユーザー管理
+// ===========================================
+
+/**
+ * ログイン認証
+ */
+function login(userName) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.MASTER_USER);
+    const data = sheet.getDataRange().getValues();
+
+    // ヘッダー行をスキップ
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const userId = row[0];
+      const name = row[1];
+      // row[2] (PIN) は使用しないがスプレッドシートのデータは保持
+      const carNumber = row[3];
+      const role = row[4];
+      const isActive = row[5];
+
+      // 氏名が一致し、有効なユーザー
+      if (name === userName && isActive === true) {
+        return {
+          success: true,
+          user: {
+            userId: userId,
+            name: name,
+            carNumber: carNumber,
+            role: role
+          }
+        };
+      }
+    }
+
+    return { success: false, message: '氏名が正しくありません、または無効なユーザーです' };
+  } catch (e) {
+    Logger.log('Login error: ' + e.message);
+    return { success: false, message: 'ログインエラーが発生しました' };
+  }
+}
+
+/**
+ * ユーザー一覧を取得（ログイン画面用）
+ */
+function getUserList() {
+  try {
+    const sheet = getSheet(SHEET_NAMES.MASTER_USER);
+    const data = sheet.getDataRange().getValues();
+    const users = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const isActive = row[5];
+
+      if (isActive === true) {
+        users.push({
+          userId: row[0],
+          name: row[1]
+        });
+      }
+    }
+
+    return { success: true, users: users };
+  } catch (e) {
+    Logger.log('GetUserList error: ' + e.message);
+    return { success: false, message: 'ユーザー一覧の取得に失敗しました' };
+  }
+}
+
+// ===========================================
+// 従業員マスタ管理
+// ===========================================
+
+/**
+ * 従業員マスタの全データを取得（管理者用）
+ */
+function getEmployeeListForAdmin() {
+  try {
+    const sheet = getSheet(SHEET_NAMES.MASTER_USER);
+    const data = sheet.getDataRange().getValues();
+    const employees = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      employees.push({
+        userId: row[0],
+        name: row[1],
+        carNumber: row[3],
+        role: row[4],
+        isActive: row[5]
+      });
+    }
+
+    return { success: true, employees: employees };
+  } catch (e) {
+    Logger.log('GetEmployeeListForAdmin error: ' + e.message);
+    return { success: false, message: '従業員一覧の取得に失敗しました' };
+  }
+}
+
+/**
+ * 従業員を追加
+ */
+function addEmployee(employeeData) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    // バリデーション
+    if (!employeeData.userId || !employeeData.name) {
+      return { success: false, message: '必須項目が入力されていません' };
+    }
+
+    const sheet = getSheet(SHEET_NAMES.MASTER_USER);
+    const data = sheet.getDataRange().getValues();
+
+    // ユーザーIDの重複チェック
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === employeeData.userId) {
+        return { success: false, message: 'このユーザーIDは既に登録されています' };
+      }
+    }
+
+    // 新規行を追加
+    const newRow = [
+      employeeData.userId,
+      employeeData.name,
+      '', // Column C (PIN) は空文字
+      employeeData.carNumber || '',
+      employeeData.role || '',
+      employeeData.isActive !== false // デフォルトはtrue
+    ];
+
+    sheet.appendRow(newRow);
+
+    return { success: true, message: '従業員を登録しました' };
+  } catch (e) {
+    Logger.log('AddEmployee error: ' + e.message);
+    return { success: false, message: '従業員の登録に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 従業員情報を更新
+ */
+function updateEmployee(employeeData) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    // バリデーション
+    if (!employeeData.userId || !employeeData.name) {
+      return { success: false, message: '必須項目が入力されていません' };
+    }
+
+    const sheet = getSheet(SHEET_NAMES.MASTER_USER);
+    const data = sheet.getDataRange().getValues();
+
+    // ユーザーIDで行を検索して更新
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === employeeData.userId) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      return { success: false, message: '従業員が見つかりません' };
+    }
+
+    // 更新（Column 3 (PIN) は更新しない）
+    sheet.getRange(rowIndex, 2).setValue(employeeData.name);
+    sheet.getRange(rowIndex, 4).setValue(employeeData.carNumber || '');
+    sheet.getRange(rowIndex, 5).setValue(employeeData.role || '');
+    sheet.getRange(rowIndex, 6).setValue(employeeData.isActive !== false);
+
+    return { success: true, message: '従業員情報を更新しました' };
+  } catch (e) {
+    Logger.log('UpdateEmployee error: ' + e.message);
+    return { success: false, message: '従業員情報の更新に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 従業員を削除（論理削除：有効フラグをfalseに設定）
+ */
+function deleteEmployee(userId) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    const sheet = getSheet(SHEET_NAMES.MASTER_USER);
+    const data = sheet.getDataRange().getValues();
+
+    // ログデータでの参照チェック
+    const logSheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const logData = logSheet.getDataRange().getValues();
+
+    let hasReferences = false;
+    for (let i = 1; i < logData.length; i++) {
+      if (logData[i][2] === userId) {
+        hasReferences = true;
+        break;
+      }
+    }
+
+    if (hasReferences) {
+      // 論理削除（有効フラグをfalseに）
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === userId) {
+          sheet.getRange(i + 1, 6).setValue(false);
+          return { success: true, message: '従業員を無効化しました（過去データが存在するため）' };
+        }
+      }
+    } else {
+      // 物理削除可能
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === userId) {
+          sheet.deleteRow(i + 1);
+          return { success: true, message: '従業員を削除しました' };
+        }
+      }
+    }
+
+    return { success: false, message: '従業員が見つかりません' };
+  } catch (e) {
+    Logger.log('DeleteEmployee error: ' + e.message);
+    return { success: false, message: '従業員の削除に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===========================================
+// 車両管理
+// ===========================================
+
+/**
+ * 車両一覧を取得
+ */
+function getCarList() {
+  try {
+    const sheet = getSheet(SHEET_NAMES.MASTER_CAR);
+    const data = sheet.getDataRange().getValues();
+    const cars = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      cars.push({
+        carNumber: row[0],
+        carType: row[1],
+        lastMeter: row[2]
+      });
+    }
+
+    return { success: true, cars: cars };
+  } catch (e) {
+    Logger.log('GetCarList error: ' + e.message);
+    return { success: false, message: '車両一覧の取得に失敗しました' };
+  }
+}
+
+/**
+ * 指定車両の前回メーター値を取得
+ */
+function getLastMeter(carNumber) {
+  try {
+    // まずログデータから最新の帰着メーターを取得
+    const logSheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const logData = logSheet.getDataRange().getValues();
+
+    let lastMeter = 0;
+    let latestDate = null;
+
+    for (let i = logData.length - 1; i >= 1; i--) {
+      const row = logData[i];
+      const carNum = row[4]; // E列：車番
+      const arrivalMeter = row[6]; // G列：帰着メーター
+      const date = row[1]; // B列：日付
+
+      if (carNum === carNumber && arrivalMeter && arrivalMeter > 0) {
+        if (!latestDate || date > latestDate) {
+          latestDate = date;
+          lastMeter = arrivalMeter;
+        }
+      }
+    }
+
+    // ログデータに存在しない場合、マスタの最終メーターを取得
+    if (lastMeter === 0) {
+      const carSheet = getSheet(SHEET_NAMES.MASTER_CAR);
+      const carData = carSheet.getDataRange().getValues();
+
+      for (let i = 1; i < carData.length; i++) {
+        const row = carData[i];
+        if (row[0] === carNumber) {
+          lastMeter = row[2] || 0; // C列：最終メーター
+          break;
+        }
+      }
+    }
+
+    return { success: true, lastMeter: lastMeter };
+  } catch (e) {
+    Logger.log('GetLastMeter error: ' + e.message);
+    return { success: false, message: '前回メーター値の取得に失敗しました', lastMeter: 0 };
+  }
+}
+
+/**
+ * 車両マスタの最終メーターを更新
+ */
+function updateCarLastMeter(carNumber, meter) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.MASTER_CAR);
+    const data = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === carNumber) {
+        sheet.getRange(i + 1, 3).setValue(meter); // C列：最終メーター
+        break;
+      }
+    }
+
+    return { success: true };
+  } catch (e) {
+    Logger.log('UpdateCarLastMeter error: ' + e.message);
+    return { success: false, message: '車両メーター更新に失敗しました' };
+  }
+}
+
+// ===========================================
+// 車両マスタ管理
+// ===========================================
+
+/**
+ * 車両マスタの全データを取得（管理者用）
+ */
+function getVehicleListForAdmin() {
+  try {
+    const sheet = getSheet(SHEET_NAMES.MASTER_CAR);
+    const data = sheet.getDataRange().getValues();
+    const vehicles = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      vehicles.push({
+        carNumber: row[0],
+        carType: row[1],
+        lastMeter: row[2] || 0
+      });
+    }
+
+    return { success: true, vehicles: vehicles };
+  } catch (e) {
+    Logger.log('GetVehicleListForAdmin error: ' + e.message);
+    return { success: false, message: '車両一覧の取得に失敗しました' };
+  }
+}
+
+/**
+ * 車両を追加
+ */
+function addVehicle(vehicleData) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    // バリデーション
+    if (!vehicleData.carNumber || !vehicleData.carType) {
+      return { success: false, message: '必須項目が入力されていません' };
+    }
+
+    const sheet = getSheet(SHEET_NAMES.MASTER_CAR);
+    const data = sheet.getDataRange().getValues();
+
+    // 車番の重複チェック
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === vehicleData.carNumber) {
+        return { success: false, message: 'この車番は既に登録されています' };
+      }
+    }
+
+    // メーター値の検証
+    const lastMeter = parseFloat(vehicleData.lastMeter) || 0;
+    if (lastMeter < 0) {
+      return { success: false, message: '最終メーターは0以上の数値を入力してください' };
+    }
+
+    // 新規行を追加
+    const newRow = [
+      vehicleData.carNumber,
+      vehicleData.carType,
+      lastMeter
+    ];
+
+    sheet.appendRow(newRow);
+
+    return { success: true, message: '車両を登録しました' };
+  } catch (e) {
+    Logger.log('AddVehicle error: ' + e.message);
+    return { success: false, message: '車両の登録に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 車両情報を更新
+ */
+function updateVehicle(vehicleData) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    // バリデーション
+    if (!vehicleData.carNumber || !vehicleData.carType) {
+      return { success: false, message: '必須項目が入力されていません' };
+    }
+
+    const sheet = getSheet(SHEET_NAMES.MASTER_CAR);
+    const data = sheet.getDataRange().getValues();
+
+    // メーター値の検証
+    const lastMeter = parseFloat(vehicleData.lastMeter) || 0;
+    if (lastMeter < 0) {
+      return { success: false, message: '最終メーターは0以上の数値を入力してください' };
+    }
+
+    // 車番で行を検索して更新
+    let rowIndex = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === vehicleData.carNumber) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (rowIndex === -1) {
+      return { success: false, message: '車両が見つかりません' };
+    }
+
+    // 更新
+    sheet.getRange(rowIndex, 2).setValue(vehicleData.carType);
+    sheet.getRange(rowIndex, 3).setValue(lastMeter);
+
+    return { success: true, message: '車両情報を更新しました' };
+  } catch (e) {
+    Logger.log('UpdateVehicle error: ' + e.message);
+    return { success: false, message: '車両情報の更新に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 車両を削除
+ */
+function deleteVehicle(carNumber) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    // ログデータでの参照チェック
+    const logSheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const logData = logSheet.getDataRange().getValues();
+
+    for (let i = 1; i < logData.length; i++) {
+      if (logData[i][4] === carNumber) {
+        return { success: false, message: 'この車両は運転日報で使用されているため削除できません' };
+      }
+    }
+
+    // 従業員マスタでの参照チェック
+    const userSheet = getSheet(SHEET_NAMES.MASTER_USER);
+    const userData = userSheet.getDataRange().getValues();
+
+    for (let i = 1; i < userData.length; i++) {
+      if (userData[i][3] === carNumber) {
+        return { success: false, message: 'この車両は従業員に割り当てられているため削除できません' };
+      }
+    }
+
+    // 削除実行
+    const sheet = getSheet(SHEET_NAMES.MASTER_CAR);
+    const data = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === carNumber) {
+        sheet.deleteRow(i + 1);
+        return { success: true, message: '車両を削除しました' };
+      }
+    }
+
+    return { success: false, message: '車両が見つかりません' };
+  } catch (e) {
+    Logger.log('DeleteVehicle error: ' + e.message);
+    return { success: false, message: '車両の削除に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===========================================
+// 出発・帰着記録
+// ===========================================
+
+/**
+ * 出発記録を保存
+ */
+function saveDeparture(data) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000); // 10秒間ロック取得を試みる
+
+    const sheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const uuid = generateUUID();
+    const now = new Date();
+
+    // 日付が指定されていればそれを使用、なければ今日の日付
+    const targetDate = data.date ? new Date(data.date) : now;
+    const dateStr = Utilities.formatDate(targetDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const yearMonth = calculateYearMonth(targetDate);
+
+    // データ検証
+    if (!data.userId || !data.userName || !data.carNumber || !data.departureMeter) {
+      return { success: false, message: '必須項目が入力されていません' };
+    }
+
+    // 同日の出発記録が既に存在するかチェック
+    const existingData = sheet.getDataRange().getValues();
+    for (let i = 1; i < existingData.length; i++) {
+      const row = existingData[i];
+      if (row[1] && row[2] === data.userId) {
+        const existingDate = Utilities.formatDate(new Date(row[1]), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        if (existingDate === dateStr) {
+          const status = row[18]; // S列: ステータス
+          if (status === STATUS.SUBMITTED || status === STATUS.APPROVED) {
+            return { success: false, message: '提出済または承認済のレコードは編集できません' };
+          }
+          // 差戻し状態または保存済・作業中の場合は編集を許可
+          return { success: false, message: '本日の出発記録は既に登録されています' };
+        }
+      }
+    }
+
+    // 新規行を追加
+    const newRow = [
+      uuid,                           // A: ID
+      dateStr,                        // B: 日付
+      data.userId,                    // C: ユーザーID
+      data.userName,                  // D: 社員名
+      data.carNumber,                 // E: 車番
+      data.departureMeter,            // F: 出発メーター
+      '',                             // G: 帰着メーター
+      '',                             // H: 走行距離
+      '',                             // I: 行先
+      data.alcoholCheckStart || '済', // J: アルコール(始)
+      data.dailyCheck || '異常なし',  // K: 日常点検
+      '',                             // L: アルコール(終)
+      '',                             // M: 車内清掃
+      '',                             // N: 不具合有無
+      '',                             // O: 不具合詳細
+      '',                             // P: 給油
+      '',                             // Q: 備考
+      yearMonth,                      // R: 対象年月
+      STATUS.WORKING,                 // S: ステータス
+      '',                             // T: 承認者
+      '',                             // U: 承認日時
+      now,                            // V: タイムスタンプ
+      ''                              // W: 差戻しコメント
+    ];
+
+    sheet.appendRow(newRow);
+
+    return { success: true, message: '出発記録を保存しました', id: uuid };
+  } catch (e) {
+    Logger.log('SaveDeparture error: ' + e.message);
+    return { success: false, message: '出発記録の保存に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 帰着記録を保存
+ */
+function saveArrival(data) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    const sheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const now = new Date();
+
+    // 日付が指定されていればそれを使用、なければ今日の日付
+    const targetDate = data.date ? new Date(data.date) : now;
+    const dateStr = Utilities.formatDate(targetDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    const yearMonth = calculateYearMonth(targetDate);
+
+    // データ検証
+    if (!data.userId || !data.userName || !data.carNumber || !data.arrivalMeter) {
+      return { success: false, message: '必須項目が入力されていません' };
+    }
+
+    // 走行距離の計算と検証
+    const departureMeter = parseFloat(data.departureMeter) || 0;
+    const arrivalMeter = parseFloat(data.arrivalMeter) || 0;
+    const distance = arrivalMeter - departureMeter;
+
+    if (distance < 0) {
+      return { success: false, message: '帰着メーターが出発メーターより小さい値です。入力値を確認してください。' };
+    }
+
+    if (distance > 1000) {
+      // 警告は出すが保存は許可する
+      Logger.log('Warning: Long distance detected - ' + distance + ' km');
+    }
+
+    // 不具合ありの場合、詳細が必須
+    if (data.troubleStatus === 'あり' && (!data.troubleDetail || data.troubleDetail.trim() === '')) {
+      return { success: false, message: '不具合の詳細を入力してください' };
+    }
+
+    // 同日の記録を探して更新、なければ新規作成
+    const existingData = sheet.getDataRange().getValues();
+    let rowIndex = -1;
+    let existingDepartureMeter = null;
+
+    for (let i = 1; i < existingData.length; i++) {
+      const row = existingData[i];
+      if (row[2] === data.userId) {
+        const existingDate = row[1] ? Utilities.formatDate(new Date(row[1]), Session.getScriptTimeZone(), 'yyyy-MM-dd') : '';
+        if (existingDate === dateStr) {
+          rowIndex = i + 1;
+          existingDepartureMeter = row[5]; // F列: 出発メーター
+          break;
+        }
+      }
+    }
+
+    // データ整合性チェック：出発記録との整合性確認
+    if (rowIndex > 0 && existingDepartureMeter !== null) {
+      // 出発記録が存在する場合、出発メーター値の整合性をチェック
+      const recordedDeparture = parseFloat(existingDepartureMeter) || 0;
+      const submittedDeparture = parseFloat(data.departureMeter) || 0;
+      const meterDifference = Math.abs(recordedDeparture - submittedDeparture);
+
+      if (meterDifference > 0) {
+        Logger.log('警告: 出発記録の出発メーター(' + recordedDeparture + ')と帰着登録時の出発メーター(' + submittedDeparture + ')に差異があります。差: ' + meterDifference + ' km');
+
+        // 大きな差異がある場合（10km以上）は警告を返す
+        if (meterDifference >= 10) {
+          return {
+            success: false,
+            message: '出発メーターの値が出発記録と大きく異なります（記録: ' + recordedDeparture + ' km、入力: ' + submittedDeparture + ' km）。値を確認してください。'
+          };
+        }
+      }
+    } else {
+      // 出発記録が存在しない場合の警告ログ
+      Logger.log('警告: ユーザー「' + data.userName + '」の' + dateStr + 'の出発記録が見つかりません。帰着記録のみを保存します。');
+    }
+
+    if (rowIndex > 0) {
+      // ステータスチェック: 提出済または承認済のレコードは編集不可
+      const status = existingData[rowIndex - 1][18]; // S列: ステータス
+      if (status === STATUS.SUBMITTED || status === STATUS.APPROVED) {
+        return { success: false, message: '提出済または承認済のレコードは編集できません' };
+      }
+
+      // 既存レコードを更新
+      sheet.getRange(rowIndex, 6).setValue(departureMeter);      // F: 出発メーター（編集された場合に更新）
+      sheet.getRange(rowIndex, 7).setValue(arrivalMeter);        // G: 帰着メーター
+      sheet.getRange(rowIndex, 8).setValue(distance);            // H: 走行距離
+      sheet.getRange(rowIndex, 9).setValue(data.destination || ''); // I: 行先
+      sheet.getRange(rowIndex, 12).setValue(data.alcoholCheckEnd || '済'); // L: アルコール(終)
+      sheet.getRange(rowIndex, 13).setValue(data.carCleaning || '済'); // M: 車内清掃
+      sheet.getRange(rowIndex, 14).setValue(data.troubleStatus || 'なし'); // N: 不具合有無
+      sheet.getRange(rowIndex, 15).setValue(data.troubleDetail || ''); // O: 不具合詳細
+      sheet.getRange(rowIndex, 16).setValue(data.refuel || 0);   // P: 給油
+      sheet.getRange(rowIndex, 17).setValue(data.remarks || ''); // Q: 備考
+      sheet.getRange(rowIndex, 19).setValue(STATUS.SAVED);       // S: ステータス（差戻し状態から編集した場合は保存済に戻る）
+      sheet.getRange(rowIndex, 22).setValue(now);                // V: タイムスタンプ
+    } else {
+      // 新規作成（救済措置：出発記録がない場合）
+      const uuid = generateUUID();
+      const newRow = [
+        uuid,
+        dateStr,
+        data.userId,
+        data.userName,
+        data.carNumber,
+        departureMeter,
+        arrivalMeter,
+        distance,
+        data.destination || '',
+        '済', // 出発時アルコールチェック（救済時は済と仮定）
+        '異常なし', // 日常点検（救済時は異常なしと仮定）
+        data.alcoholCheckEnd || '済',
+        data.carCleaning || '済',
+        data.troubleStatus || 'なし',
+        data.troubleDetail || '',
+        data.refuel || 0,
+        data.remarks || '',
+        yearMonth,
+        STATUS.SAVED,
+        '',
+        '',
+        now,
+        ''  // W: 差戻しコメント
+      ];
+      sheet.appendRow(newRow);
+    }
+
+    // 車両マスタの最終メーターを更新
+    updateCarLastMeter(data.carNumber, arrivalMeter);
+
+    return { success: true, message: '帰着記録を保存しました' };
+  } catch (e) {
+    Logger.log('SaveArrival error: ' + e.message);
+    return { success: false, message: '帰着記録の保存に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===========================================
+// 履歴・集計
+// ===========================================
+
+/**
+ * 指定ユーザーの指定月度の履歴を取得
+ */
+function getHistory(userId, yearMonth) {
+  try {
+    Logger.log('getHistory呼び出し: userId=' + userId + ', yearMonth=' + yearMonth);
+
+    const sheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const data = sheet.getDataRange().getValues();
+    const period = getMonthPeriod(yearMonth);
+    const startDate = new Date(period.start);
+    const endDate = new Date(period.end);
+
+    Logger.log('検索期間: ' + period.start + ' 〜 ' + period.end);
+    Logger.log('データ行数: ' + (data.length - 1));
+
+    // 車両マスタを一度だけ読み込み（パフォーマンス最適化）
+    const carSheet = getSheet(SHEET_NAMES.MASTER_CAR);
+    const carData = carSheet.getDataRange().getValues();
+    const carMap = {};
+    for (let j = 1; j < carData.length; j++) {
+      carMap[carData[j][0]] = carData[j][1]; // carNumber -> carType
+    }
+
+    const records = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const recordUserId = row[2];
+      const recordDate = new Date(row[1]);
+
+      if (recordUserId === userId && recordDate >= startDate && recordDate <= endDate) {
+        const carNumber = row[4];
+        const carType = carMap[carNumber] || '';
+
+        // yearMonthが日付オブジェクトの場合は文字列に変換
+        let recordYearMonth = row[17];
+        if (recordYearMonth instanceof Date) {
+          recordYearMonth = Utilities.formatDate(recordYearMonth, Session.getScriptTimeZone(), 'yyyy-MM');
+        } else if (typeof recordYearMonth === 'string') {
+          recordYearMonth = recordYearMonth;
+        } else {
+          recordYearMonth = String(recordYearMonth);
+        }
+
+        records.push({
+          id: row[0],
+          date: Utilities.formatDate(recordDate, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+          carNumber: carNumber,
+          carType: carType,
+          departureMeter: row[5],
+          arrivalMeter: row[6],
+          distance: row[7],
+          destination: row[8],
+          alcoholStart: row[9],
+          dailyCheck: row[10],
+          alcoholEnd: row[11],
+          carCleaning: row[12],
+          troubleStatus: row[13],
+          troubleDetail: row[14],
+          refuel: row[15],
+          remarks: row[16],
+          yearMonth: recordYearMonth,
+          status: row[18],
+          rejectComment: row[22] || '', // W列: 差戻しコメント
+          timestamp: row[21] ? new Date(row[21]).getTime() : 0
+        });
+      }
+    }
+
+    // 日付降順でソート
+    records.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    Logger.log('取得したレコード数: ' + records.length);
+
+    return { success: true, records: records };
+  } catch (e) {
+    Logger.log('GetHistory error: ' + e.message);
+    return { success: false, message: '履歴の取得に失敗しました' };
+  }
+}
+
+/**
+ * 指定ユーザーの指定月度の累計走行距離を取得
+ */
+function getMonthlyDistance(userId, yearMonth) {
+  try {
+    const historyResult = getHistory(userId, yearMonth);
+    if (!historyResult.success) {
+      return historyResult;
+    }
+
+    let totalDistance = 0;
+    let workDays = 0;
+
+    historyResult.records.forEach(record => {
+      if (record.distance && record.distance > 0) {
+        totalDistance += parseFloat(record.distance);
+        workDays++;
+      }
+    });
+
+    return {
+      success: true,
+      totalDistance: totalDistance,
+      workDays: workDays,
+      recordCount: historyResult.records.length
+    };
+  } catch (e) {
+    Logger.log('GetMonthlyDistance error: ' + e.message);
+    return { success: false, message: '月間走行距離の取得に失敗しました' };
+  }
+}
+
+/**
+ * 月次データを一括提出
+ */
+function submitMonthly(userId, yearMonth) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    const sheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const data = sheet.getDataRange().getValues();
+    const period = getMonthPeriod(yearMonth);
+    const startDate = new Date(period.start);
+    const endDate = new Date(period.end);
+
+    let updatedCount = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const recordUserId = row[2];
+      const recordDate = new Date(row[1]);
+      const status = row[18];
+
+      // 対象期間、対象ユーザー、保存済・作業中・差戻しステータスのレコードを提出済に変更
+      if (recordUserId === userId &&
+          recordDate >= startDate &&
+          recordDate <= endDate &&
+          (status === STATUS.SAVED || status === STATUS.WORKING || status === STATUS.REJECTED)) {
+        sheet.getRange(i + 1, 19).setValue(STATUS.SUBMITTED);
+        updatedCount++;
+      }
+    }
+
+    return { success: true, message: updatedCount + '件のレコードを提出しました', count: updatedCount };
+  } catch (e) {
+    Logger.log('SubmitMonthly error: ' + e.message);
+    return { success: false, message: '月次提出に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===========================================
+// 管理者機能
+// ===========================================
+
+/**
+ * テスト関数：スプレッドシートへのアクセスをテスト
+ */
+function testSpreadsheetAccess() {
+  try {
+    Logger.log('=== スプレッドシートアクセステスト開始 ===');
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    Logger.log('スプレッドシート名: ' + ss.getName());
+
+    const sheets = ss.getSheets();
+    Logger.log('シート数: ' + sheets.length);
+    Logger.log('シート名一覧: ' + sheets.map(s => s.getName()).join(', '));
+
+    const logSheet = ss.getSheetByName(SHEET_NAMES.LOG_DATA);
+    if (logSheet) {
+      const rowCount = logSheet.getLastRow();
+      Logger.log('log_dataシートの行数: ' + rowCount);
+    } else {
+      Logger.log('log_dataシートが見つかりません！');
+    }
+
+    Logger.log('=== テスト完了 ===');
+    return { success: true, message: 'アクセス成功' };
+  } catch (e) {
+    Logger.log('テストエラー: ' + e.message);
+    Logger.log('スタックトレース: ' + e.stack);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * 未承認の月次データ一覧を取得
+ */
+function getAdminPendingList() {
+  try {
+    Logger.log('getAdminPendingList呼び出し');
+    Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
+    Logger.log('SHEET_NAME: ' + SHEET_NAMES.LOG_DATA);
+
+    let sheet;
+    try {
+      sheet = getSheet(SHEET_NAMES.LOG_DATA);
+    } catch (sheetError) {
+      Logger.log('シート取得エラー: ' + sheetError.message);
+      Logger.log('スタックトレース: ' + sheetError.stack);
+      return { success: false, message: 'シートの取得に失敗しました: ' + sheetError.message };
+    }
+
+    if (!sheet) {
+      Logger.log('log_dataシートが見つかりません');
+      return { success: false, message: 'log_dataシートが見つかりません' };
+    }
+
+    Logger.log('シート取得成功');
+
+    let data;
+    try {
+      data = sheet.getDataRange().getValues();
+    } catch (dataError) {
+      Logger.log('データ取得エラー: ' + dataError.message);
+      return { success: false, message: 'データの取得に失敗しました: ' + dataError.message };
+    }
+
+    Logger.log('データ行数: ' + (data.length - 1));
+
+    // ユーザーごと、年月ごとにグループ化
+    const grouped = {};
+    let submittedCount = 0;
+    let approvedCount = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      try {
+        const row = data[i];
+        if (!row || row.length < 21) {
+          Logger.log('行 ' + i + ' のデータが不完全です');
+          continue;
+        }
+
+        const userId = row[2];
+        const userName = row[3];
+        // yearMonthが日付オブジェクトの場合は文字列に変換
+        let yearMonth = row[17];
+        if (yearMonth instanceof Date) {
+          yearMonth = Utilities.formatDate(yearMonth, Session.getScriptTimeZone(), 'yyyy-MM');
+        } else if (typeof yearMonth === 'string') {
+          // 既に文字列の場合はそのまま使用
+          yearMonth = yearMonth;
+        } else {
+          yearMonth = String(yearMonth);
+        }
+        const status = row[18];
+        const distance = row[7] || 0;
+        const troubleStatus = row[13];
+        const approverName = row[19] || '';
+        const approvedDate = row[20];
+        const rejectComment = row[22] || ''; // W列: 差戻しコメント
+
+        // ステータスのカウント
+        if (status === STATUS.SUBMITTED) submittedCount++;
+        if (status === STATUS.APPROVED) approvedCount++;
+
+        // 提出済または承認済のレコードのみ対象
+        if (status === STATUS.SUBMITTED || status === STATUS.APPROVED) {
+          const key = userId + '_' + yearMonth;
+
+          if (!grouped[key]) {
+            grouped[key] = {
+              userId: userId || '',
+              userName: userName || '不明',
+              yearMonth: yearMonth || '',
+              status: status,
+              totalDistance: 0,
+              workDays: 0,
+              hasTrouble: false,
+              approverName: '',
+              approvedDate: '',
+              rejectComment: ''
+            };
+          }
+
+          // 差戻しコメントを保持（最新のものを使用）
+          if (rejectComment) {
+            grouped[key].rejectComment = rejectComment;
+          }
+
+          // ステータスの優先順位: 承認済 > 提出済
+          // すでに承認済の場合は上書きしない、提出済の場合は承認済で上書き
+          if (status === STATUS.APPROVED) {
+            grouped[key].status = STATUS.APPROVED;
+            if (approverName) {
+              grouped[key].approverName = approverName;
+            }
+            if (approvedDate) {
+              try {
+                grouped[key].approvedDate = Utilities.formatDate(new Date(approvedDate), Session.getScriptTimeZone(), 'yyyy/MM/dd');
+              } catch (dateErr) {
+                Logger.log('日付フォーマットエラー: ' + dateErr.message);
+                grouped[key].approvedDate = '';
+              }
+            }
+          }
+
+          grouped[key].totalDistance += parseFloat(distance) || 0;
+          if (distance > 0) {
+            grouped[key].workDays++;
+          }
+          if (troubleStatus === 'あり') {
+            grouped[key].hasTrouble = true;
+          }
+        }
+      } catch (rowError) {
+        Logger.log('行 ' + i + ' の処理エラー: ' + rowError.message);
+        continue;
+      }
+    }
+
+    // 配列に変換
+    const list = Object.values(grouped);
+
+    Logger.log('提出済レコード数: ' + submittedCount);
+    Logger.log('承認済レコード数: ' + approvedCount);
+    Logger.log('グループ化後の件数: ' + list.length);
+
+    // デバッグ: 最初のアイテムの内容を確認
+    if (list.length > 0) {
+      Logger.log('最初のアイテムのサンプル: ' + JSON.stringify(list[0]));
+    }
+
+    // 提出済と承認済の両方を返す（管理者画面で両方表示するため）
+    Logger.log('返却するリスト件数: ' + list.length);
+
+    return { success: true, list: list };
+  } catch (e) {
+    Logger.log('GetAdminPendingList error: ' + e.message);
+    Logger.log('エラースタックトレース: ' + e.stack);
+    Logger.log('エラー型: ' + e.name);
+    return { success: false, message: '未承認一覧の取得に失敗しました: ' + e.message };
+  }
+}
+
+/**
+ * 月次データを承認
+ */
+function approveMonthly(userId, yearMonth, approverName) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    const sheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const data = sheet.getDataRange().getValues();
+    const period = getMonthPeriod(yearMonth);
+    const startDate = new Date(period.start);
+    const endDate = new Date(period.end);
+    const now = new Date();
+
+    let updatedCount = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const recordUserId = row[2];
+      const recordDate = new Date(row[1]);
+      const status = row[18];
+
+      if (recordUserId === userId &&
+          recordDate >= startDate &&
+          recordDate <= endDate &&
+          status === STATUS.SUBMITTED) {
+        sheet.getRange(i + 1, 19).setValue(STATUS.APPROVED);     // S: ステータス
+        sheet.getRange(i + 1, 20).setValue(approverName);        // T: 承認者
+        sheet.getRange(i + 1, 21).setValue(now);                 // U: 承認日時
+        updatedCount++;
+      }
+    }
+
+    return { success: true, message: updatedCount + '件のレコードを承認しました', count: updatedCount };
+  } catch (e) {
+    Logger.log('ApproveMonthly error: ' + e.message);
+    return { success: false, message: '承認処理に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 月次データを差戻し
+ */
+function rejectMonthly(userId, yearMonth, comment) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+
+    const sheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const data = sheet.getDataRange().getValues();
+    const period = getMonthPeriod(yearMonth);
+    const startDate = new Date(period.start);
+    const endDate = new Date(period.end);
+
+    let updatedCount = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const recordUserId = row[2];
+      const recordDate = new Date(row[1]);
+      const status = row[18];
+
+      if (recordUserId === userId &&
+          recordDate >= startDate &&
+          recordDate <= endDate &&
+          status === STATUS.SUBMITTED) {
+        sheet.getRange(i + 1, 19).setValue(STATUS.REJECTED); // 差戻し状態に
+        sheet.getRange(i + 1, 23).setValue(comment || ''); // W列: 差戻しコメント
+        sheet.getRange(i + 1, 20).setValue(''); // T列: 承認者をクリア
+        sheet.getRange(i + 1, 21).setValue(''); // U列: 承認日時をクリア
+        updatedCount++;
+      }
+    }
+
+    return { success: true, message: updatedCount + '件のレコードを差戻しました', count: updatedCount };
+  } catch (e) {
+    Logger.log('RejectMonthly error: ' + e.message);
+    return { success: false, message: '差戻し処理に失敗しました: ' + e.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * CSVエクスポート用データ取得
+ */
+function getExportData(yearMonth) {
+  try {
+    const sheet = getSheet(SHEET_NAMES.LOG_DATA);
+    const data = sheet.getDataRange().getValues();
+    const period = getMonthPeriod(yearMonth);
+    const startDate = new Date(period.start);
+    const endDate = new Date(period.end);
+
+    const exportData = [];
+    exportData.push(data[0]); // ヘッダー行
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const recordDate = new Date(row[1]);
+
+      // yearMonthが日付オブジェクトの場合は文字列に変換
+      let recordYearMonth = row[17];
+      if (recordYearMonth instanceof Date) {
+        recordYearMonth = Utilities.formatDate(recordYearMonth, Session.getScriptTimeZone(), 'yyyy-MM');
+      } else if (typeof recordYearMonth === 'string') {
+        recordYearMonth = recordYearMonth;
+      } else {
+        recordYearMonth = String(recordYearMonth);
+      }
+
+      if (recordYearMonth === yearMonth || (recordDate >= startDate && recordDate <= endDate)) {
+        exportData.push(row);
+      }
+    }
+
+    return { success: true, data: exportData };
+  } catch (e) {
+    Logger.log('GetExportData error: ' + e.message);
+    return { success: false, message: 'エクスポートデータの取得に失敗しました' };
+  }
+}
+
+// ===========================================
+// テスト・デバッグ用
+// ===========================================
+
+/**
+ * テスト用：スプレッドシート接続確認
+ */
+function testConnection() {
+  try {
+    const ss = getSpreadsheet();
+    Logger.log('スプレッドシート名: ' + ss.getName());
+    Logger.log('接続成功');
+    return { success: true, name: ss.getName() };
+  } catch (e) {
+    Logger.log('接続失敗: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * テスト用：現在の年月度を取得
+ */
+function testGetCurrentYearMonth() {
+  const ym = getCurrentYearMonth();
+  const period = getMonthPeriod(ym);
+  Logger.log('現在の年月度: ' + ym);
+  Logger.log('期間: ' + period.start + ' 〜 ' + period.end);
+  return { yearMonth: ym, period: period };
+}
